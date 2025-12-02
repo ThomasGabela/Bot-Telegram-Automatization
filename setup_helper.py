@@ -79,6 +79,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    # test_drive() # Ejecuta la prueba de Drive
-    # test_drive_config() # Ejecuta la prueba de Drive y configuración
+    test_drive() # Ejecuta la prueba de Drive
+    test_drive_config() # Ejecuta la prueba de Drive y configuración
     asyncio.run(main()) # Solo lógica de Telegram (Userbot)

@@ -39,16 +39,29 @@ class TelegramService:
             log.info("Telegram desconectado.")
 
     def add_handler(self, handler_function):
-            """Permite inyectar lógica de respuesta desde otros módulos"""
-            # Escuchar solo mensajes de MÍ MISMO (Saved Messages) que sean texto
+            """Permite inyectar lógica de respuesta."""
+            # CORRECCIÓN: 
+            # filters.me = Mensajes enviados por MÍ (ej: en Mensajes Guardados).
+            # filters.incoming & filters.private = Mensajes que me envían otros al privado.
+            # Usamos (filters.me | filters.incoming) para escuchar TODO en pruebas.
+            
+            my_filters = filters.text & (filters.me | filters.incoming & filters.private)
+
             new_handler = MessageHandler(
-                        handler_function,
-                        filters.me & filters.text  # Solo escucha mis mensajes de texto
-                    )
+                handler_function,
+                my_filters
+            )
 
-            # Lo añadimos al cliente directamente
             self.client.add_handler(new_handler)
-            log.info("Handler de ChatOps registrado correctamente.")
-
+            log.info("👂 Handler registrado: Escuchando Mensajes Guardados y DMs.")
+                # log.info("Handler de ChatOps registrado correctamente.")
+            
+    async def send_message_to_me(self, text):
+        """Método de prueba: Se envía un mensaje a 'Mensajes Guardados'"""
+        try:
+            await self.client.send_message("me", text)
+            log.info("Mensaje de prueba enviado a 'Mensajes Guardados'.")
+        except Exception as e:
+            log.error(f"Error enviando mensaje: {e}")
 # Instancia global
 telegram_service = TelegramService()

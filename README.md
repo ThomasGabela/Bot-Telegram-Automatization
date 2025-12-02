@@ -1,4 +1,3 @@
-````markdown
 # 🤖 Telegram Content Automation Bot (Cloud-Native)
 
 **Sistema de automatización de contenidos para Telegram integrado con Google Drive.**

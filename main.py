@@ -21,6 +21,7 @@ async def scheduler_loop():
         # Por simplicidad en este ejemplo:
         await scheduled_job()
         await asyncio.sleep(60 * config.CHECK_INTERVAL)
+        # await asyncio.sleep(1 * config.CHECK_INTERVAL)
 
 async def main():
     log.info("--- SISTEMA INICIADO (MODO CHATOPS) ---")
@@ -55,5 +56,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
-if __name__ == "__main__":
-    main()
