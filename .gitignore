@@ -1,0 +1,21 @@
+# --- Entornos Virtuales y Cache ---
+venv/
+__pycache__/
+*.pyc
+
+# --- Archivos de Configuración y Secretos (JAMÁS SUBIR) ---
+.env
+credentials.json
+
+# --- Sesiones de Telegram (Esto daría acceso a tu cuenta) ---
+*.session
+*.session-journal
+
+# --- Archivos Temporales ---
+downloads/
+logs/
+test/
+
+# --- IDEs (Opcional) ---
+.vscode/
+.idea/

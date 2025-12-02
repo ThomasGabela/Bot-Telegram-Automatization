@@ -1,0 +1,1 @@
+# Manejo de descargas y carpetas locales
