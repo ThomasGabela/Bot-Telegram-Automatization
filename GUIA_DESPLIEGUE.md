@@ -73,3 +73,5 @@ Este documento detalla los pasos exactos para mover el Bot de Telegram de un ent
 2.  Iniciar el bot:
     `python main.py`
     * *La primera vez pedirá ingresar el código de Telegram enviado al celular del cliente para autorizar la sesión.*
+
+3. Ejecutar debug_telegram para obtener el ID del chat propio.

@@ -1,5 +1,5 @@
 import asyncio
-import platform  # <--- NUEVO
+import platform
 from src.config.settings import config
 from src.services.telegram_service import telegram_service
 from src.core.chat_manager import chat_manager
@@ -9,7 +9,7 @@ from pyrogram import idle
 # Función que ejecuta el chequeo de horarios (El Cron)
 async def scheduled_job():
     log.info("⏰ Ejecutando ciclo de revisión programado...")
-    # await processor.run_cycle()
+    # Aquí iría la llamada a processor.run_cycle() en el futuro
     pass
 
 async def scheduler_loop():
@@ -24,7 +24,7 @@ async def main():
     # 1. Iniciar Telegram
     await telegram_service.start()
     
-    # 2. Conectar el Chat Manager (Filtro Abierto)
+    # 2. Conectar el Chat Manager (Escucha activa)
     telegram_service.add_handler(chat_manager.handle_incoming_message)
     
     log.info("🤖 Bot escuchando mensajes...")
@@ -32,7 +32,7 @@ async def main():
     # 3. Correr procesos en paralelo
     task_scheduler = asyncio.create_task(scheduler_loop())
     
-    # Mantener corriendo (idle bloquea aquí)
+    # Mantener corriendo (idle bloquea aquí hasta Ctrl+C)
     await idle()
     
     # Cierre limpio
@@ -40,11 +40,10 @@ async def main():
     await telegram_service.stop()
 
 if __name__ == "__main__":
-    # --- CORRECCIÓN CRÍTICA PARA WINDOWS ---
+    # --- PARCHE CRÍTICO PARA WINDOWS ---
     if platform.system() == 'Windows':
-        print("⚠️ Aplicando parche de bucle de eventos para Windows...")
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    # ---------------------------------------
+    # -----------------------------------
 
     try:
         asyncio.run(main())
