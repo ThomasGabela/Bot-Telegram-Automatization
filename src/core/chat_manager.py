@@ -73,8 +73,9 @@ class ChatManager:
         Analiza cada mensaje entrante o saliente (Mensajes Guardados).
         """
         # --- DEBUG LOG: Confirmación visual de que el mensaje llegó ---
-        sender = message.from_user.first_name if message.from_user else "Desconocido"
-        log.info(f"👂 OÍDO: Mensaje de {sender} (ChatID: {message.chat.id}): '{message.text}'")
+        log.info(f"⚡ UPDATE: {message.text} | Chat ID: {message.chat.id}")
+        
+        text = message.text
         # -------------------------------------------------------------
 
         text = message.text

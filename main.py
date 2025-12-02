@@ -1,27 +1,22 @@
 import asyncio
+import platform  # <--- NUEVO
 from src.config.settings import config
 from src.services.telegram_service import telegram_service
 from src.core.chat_manager import chat_manager
 from src.utils.logger import log
-import schedule
-import time
+from pyrogram import idle
 
 # Función que ejecuta el chequeo de horarios (El Cron)
 async def scheduled_job():
     log.info("⏰ Ejecutando ciclo de revisión programado...")
-    # Aqui iría la llamada a processor.run_cycle()
-    # await processor.run_cycle() 
+    # await processor.run_cycle()
     pass
 
 async def scheduler_loop():
     """Bucle infinito que revisa el reloj cada minuto"""
     while True:
-        # Ejecutamos schedule
-        # Nota: schedule de python es sincrono, para async es mejor hacerlo manual o simple
-        # Por simplicidad en este ejemplo:
         await scheduled_job()
         await asyncio.sleep(60 * config.CHECK_INTERVAL)
-        # await asyncio.sleep(1 * config.CHECK_INTERVAL)
 
 async def main():
     log.info("--- SISTEMA INICIADO (MODO CHATOPS) ---")
@@ -29,29 +24,28 @@ async def main():
     # 1. Iniciar Telegram
     await telegram_service.start()
     
-    # 2. Conectar el Chat Manager al Telegram Service
+    # 2. Conectar el Chat Manager (Filtro Abierto)
     telegram_service.add_handler(chat_manager.handle_incoming_message)
     
-    log.info("🤖 Bot escuchando mensajes en 'Mensajes Guardados'...")
-    log.info(f"⏱️ Ciclo de publicación automático cada {config.CHECK_INTERVAL} mins.")
-
-    # 3. Correr ambos procesos en paralelo:
-    # A. El cliente de Telegram (escuchando)
-    # B. El cronómetro (publicando)
+    log.info("🤖 Bot escuchando mensajes...")
     
-    # Usamos gather para correr tareas en paralelo
-    # Nota: Pyrogram idle() bloquea, asi que lo manejamos con tareas de asyncio
+    # 3. Correr procesos en paralelo
     task_scheduler = asyncio.create_task(scheduler_loop())
     
-    # Mantenemos el bot corriendo hasta que se detenga manualmente (Ctrl+C)
-    from pyrogram import idle
+    # Mantener corriendo (idle bloquea aquí)
     await idle()
     
-    # Cierre
+    # Cierre limpio
     task_scheduler.cancel()
     await telegram_service.stop()
 
 if __name__ == "__main__":
+    # --- CORRECCIÓN CRÍTICA PARA WINDOWS ---
+    if platform.system() == 'Windows':
+        print("⚠️ Aplicando parche de bucle de eventos para Windows...")
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # ---------------------------------------
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

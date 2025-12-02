@@ -45,11 +45,15 @@ class TelegramService:
             # filters.incoming & filters.private = Mensajes que me envían otros al privado.
             # Usamos (filters.me | filters.incoming) para escuchar TODO en pruebas.
             
-            my_filters = filters.text & (filters.me | filters.incoming & filters.private)
+            # my_filters = filters.text & (filters.me | filters.incoming & filters.private)
 
+            # new_handler = MessageHandler(
+            #     handler_function,
+            #     my_filters
+            # )
             new_handler = MessageHandler(
                 handler_function,
-                my_filters
+                filters.text
             )
 
             self.client.add_handler(new_handler)
