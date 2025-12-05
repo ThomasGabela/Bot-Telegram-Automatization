@@ -27,8 +27,8 @@ class Settings:
     EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
     
     #Files in Drive
-    FILE_SCHEDULE = "config.txt"
-    FILE_EMOJIS = "mis_emojis.txt"
+    FILE_SCHEDULE = "schedule"
+    FILE_EMOJIS = "mis_emojis"
 
 # Instancia global para importar en otros lados
 config = Settings()

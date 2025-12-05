@@ -1,5 +1,3 @@
-# Lógica de texto, emojis y validación de hora
-
 import os
 import re
 from src.services.drive_service import drive_service
@@ -34,103 +32,63 @@ class Processor:
     def process_text_emojis(self, text):
         """
         Reemplaza los alias :fuego: por Entidades Premium de Telegram.
-        Retorna: (texto_limpio, lista_de_entidades)
         """
-        # Nota: Pyrogram maneja los Custom Emojis incrustados en Markdown de forma especial.
-        # La forma más robusta es usar la sintaxis de Pyrogram para emojis:
-        # <emoji id="123456">🔥</emoji>
-        # Pero eso requiere parse mode XML o HTML.
-        
-        # ESTRATEGIA: Vamos a usar HTML que es más fácil de inyectar.
         processed_text = text
-        
-        if not self.emojis_map:
-            return processed_text # Si no hay mapa, devuelve texto tal cual
-
+        if not self.emojis_map: return processed_text 
         for alias, emoji_id in self.emojis_map.items():
             # Reemplazar :fuego: por el tag HTML de Telegram
-            # Usamos un caracter invisible o un emoji fallback dentro del tag
             html_tag = f'<emoji id="{emoji_id}">⚡</emoji>' 
             processed_text = processed_text.replace(alias, html_tag)
             
         return processed_text
 
-    async def execute_agency_post(self, agency_folder_name):
-        """
-        Flujo completo de publicación para una agencia
-        """
-        log.info(f"🚀 Iniciando proceso para: {agency_folder_name}")
-
-        # 1. Buscar la carpeta de la agencia en Drive
-        agency_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, agency_folder_name, is_folder=True)
-        if not agency_id:
-            raise Exception(f"No se encontró la carpeta '{agency_folder_name}' en Drive.")
-
-        # 2. Listar archivos dentro
-        files = drive_service.list_files_in_folder(agency_id)
-        if not files:
-            raise Exception("La carpeta está vacía.")
-
-        # 3. Clasificar archivos
-        media_files = []
-        caption_text = ""
-
-        for file in files:
-            name = file['name'].lower()
-            fid = file['id']
-            mime = file['mimeType']
-
-            if name.endswith('.txt'):
-                # Es el caption
-                caption_text = drive_service.get_text_content(fid)
-            elif 'image' in mime or 'video' in mime:
-                # Es multimedia
-                media_files.append(file)
-
-        if not media_files:
-            raise Exception("No hay imágenes ni videos para publicar.")
-
-        # 4. Procesar Texto (Emojis)
-        final_caption = self.process_text_emojis(caption_text)
-
-        # 5. Descargar Multimedia (Solo el primero por ahora para simplificar V1)
-        # TODO: Implementar lógica de álbumes (varias fotos) si es necesario
-        primary_file = media_files[0] 
-        log.info(f"Descargando archivo: {primary_file['name']}...")
-        
-        local_path = drive_service.download_file(primary_file['id'], primary_file['name'])
-        
-        if not local_path:
-            raise Exception("Fallo la descarga del archivo multimedia.")
-
-        # 6. ENVIAR A TELEGRAM (Userbot)
-        # Enviamos al Chat "Me" (Mensajes Guardados) para probar, luego será un canal real
-        # o el ID del chat destino configurado.
-        try:
-            log.info("Subiendo a Telegram...")
+    async def execute_agency_post(self, agency_folder_name, target_chat_id="me"):
+            log.info(f"🚀 Procesando agencia: {agency_folder_name}")
             
-            # Detectar si es foto o video para usar el método correcto
-            if 'image' in primary_file['mimeType']:
-                await telegram_service.client.send_photo(
-                    chat_id="me", # <--- CAMBIAR ESTO POR EL ID DEL CANAL DESTINO
-                    photo=local_path,
-                    caption=final_caption
-                )
-            elif 'video' in primary_file['mimeType']:
-                await telegram_service.client.send_video(
-                    chat_id="me",
-                    video=local_path,
-                    caption=final_caption
-                )
+            # 1. Buscar carpeta
+            agency_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, agency_folder_name, is_folder=True)
+            if not agency_id: raise Exception(f"Carpeta '{agency_folder_name}' no encontrada.")
+
+            # 2. Listar contenido
+            files = drive_service.list_files_in_folder(agency_id)
+            if not files: raise Exception("Carpeta vacía.")
+
+            media_files = []
+            caption_text = ""
+
+            # 3. Clasificar (Soporte Docs activado)
+            for f in files:
+                name = f['name'].lower()
+                mime = f['mimeType']
+                
+                # Es texto si termina en .txt O es un Google Doc
+                if name.startswith('caption') and (name.endswith('.txt') or mime == 'application/vnd.google-apps.document'):
+                    caption_text = drive_service.get_text_content(f['id'])
+                elif 'image' in mime or 'video' in mime:
+                    media_files.append(f)
+
+            if not media_files: raise Exception("No hay imágenes/video.")
             
-            log.info("✅ ¡Publicación enviada con éxito!")
+            # 4. Procesar
+            final_caption = self.process_text_emojis(caption_text)
             
-            # Limpieza: Borrar archivo local
-            os.remove(local_path)
-            
-        except Exception as e:
-            log.error(f"Error enviando a Telegram: {e}")
-            raise e
+            # 5. Descargar Media (Toma el primero)
+            media = media_files[0]
+            local_path = drive_service.download_file(media['id'], media['name'])
+            if not local_path: raise Exception("Error descargando media.")
+
+            # 6. Enviar
+            try:
+                log.info(f"Enviando a {target_chat_id}...")
+                if 'image' in media['mimeType']:
+                    await telegram_service.client.send_photo(target_chat_id, photo=local_path, caption=final_caption)
+                elif 'video' in media['mimeType']:
+                    await telegram_service.client.send_video(target_chat_id, video=local_path, caption=final_caption)
+                os.remove(local_path)
+                log.info("✅ Enviado.")
+            except Exception as e:
+                log.error(f"Error Telegram: {e}")
+                raise e
 
 # Instancia Global
 processor = Processor()

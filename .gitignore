@@ -6,6 +6,7 @@ __pycache__/
 # --- Archivos de Configuración y Secretos (JAMÁS SUBIR) ---
 .env
 credentials.json
+token.json
 
 # --- Sesiones de Telegram (Esto daría acceso a tu cuenta) ---
 *.session
