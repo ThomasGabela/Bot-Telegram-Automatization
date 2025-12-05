@@ -16,6 +16,7 @@ token.json
 downloads/
 logs/
 test/
+data/
 
 # --- IDEs (Opcional) ---
 .vscode/

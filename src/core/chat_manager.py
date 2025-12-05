@@ -2,6 +2,7 @@ from src.services.drive_service import drive_service
 from src.core.procesador import processor
 from src.utils.logger import log
 from pyrogram import enums
+from src.core.scheduler import scheduler # Importamos el scheduler
 
 class ChatManager:
     async def handle_incoming_message(self, client, message):
@@ -30,6 +31,13 @@ class ChatManager:
         # COMANDOS SIMPLES
         if len(lines) == 1:
             cmd = lines[0].lower().strip()
+            # RECARGA MANUAL (Optimización)
+            
+            if cmd == "/reload" or cmd == "reload":
+                msg = await message.reply_text("🔄 Recargando configuraciones desde Drive...")
+                await scheduler.force_reload()
+                await msg.edit_text("✅ **Sistema Actualizado**\nNuevos horarios y Chat IDs cargados.")
+                return
             
             # Nuevo Comando: "Mensaje [Carpeta]"
             if cmd.startswith("mensaje "):
@@ -42,13 +50,26 @@ class ChatManager:
                     await message.reply_text(f"❌ Error: {e}")
                 return
 
-            if "status" in cmd:
-                await message.reply_text("🤖 **SISTEMA ONLINE**")
+            if "status" == cmd or "ayuda" == cmd:
+                await message.reply_text(
+                    "🤖 **SISTEMA ONLINE**"
+                    "\n\nComandos disponibles:\n"
+                    "`reload` - Recarga manual de configuraciones desde Drive.\n"
+                    "`mensaje [Carpeta]` - Envía manualmente el contenido de la carpeta especificada.\n"
+                    "`carpetas` - Lista las carpetas/agencias disponibles en Drive.\n\n"
+                    "Para guardar captions, envía el nombre de la carpeta en la primera línea, en la segunda línea el mensaje (con emojis si quieres).\n"
+                    "Ejemplo:\n"
+                    "```\n"
+                    "SiempreGana\n"
+                    "Este es el mensaje con emoji 🔥\n"
+                    "Este es otro párrafo que tambien se guardara ❤️.\n"
+                    )
                 return
 
             elif "carpetas" in cmd:
                 await message.reply_text("🔎 Buscando carpetas...")
                 folders = drive_service.get_available_folders()
+                folders.remove("Settings") if "Settings" in folders else None
                 if folders:
                     list_text = "\n".join([f"📂 `{f}`" for f in folders])
                     await message.reply_text(f"**Carpetas Disponibles:**\n\n{list_text}")
@@ -56,10 +77,16 @@ class ChatManager:
                     await message.reply_text("⚠️ No encontré carpetas.")
                 return
             
+            
             return
 
         # ... (Mantener lógica de guardado de caption existente) ...
         folder_target = lines[0].strip()
+        
+        if folder_target.lower() == "settings":
+            await message.reply_text("❌ No permitido guardar en 'Settings'. Elige otro nombre de carpeta.")
+            return
+        
         # ... (Resto del código original para guardar caption) ...
         # Asegúrate de usar .text.html para no perder los emojis al guardar
         if len(lines) > 1:

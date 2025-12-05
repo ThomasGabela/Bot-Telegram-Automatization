@@ -58,10 +58,11 @@ class DriveService:
         except Exception as e:
             log.error(f"Error fatal conectando a Drive: {e}")
 
-    def find_item_id_by_name(self, parent_id, item_name, is_folder=False):
+    def find_item_id_by_name(self, parent_id, item_name, is_folder=False, exact_match=False):
         if not self.service: return None
         mime_type_clause = "and mimeType = 'application/vnd.google-apps.folder'" if is_folder else "and mimeType != 'application/vnd.google-apps.folder'"
-        query = f"'{parent_id}' in parents and name = '{item_name}' {mime_type_clause} and trashed = false"
+        operator = "=" if exact_match else "contains" # <--- Control total
+        query = f"'{parent_id}' in parents and name {operator} '{item_name}' {mime_type_clause} and trashed = false"
         try:
             results = self.service.files().list(q=query, fields="files(id, name)").execute()
             files = results.get('files', [])
