@@ -30,7 +30,7 @@ class Settings:
     #Files in Drive
     FILE_SCHEDULE = "schedule"  # Horarios
     FILE_EMOJIS = "mis_emojis"  # Mapeo de emojis (Legacy/Futuro)
-    FILE_CHAT_IDS = "chat_ids"  # Configuracion de Destinos
+    FILE_CHAT_IDS = "chat_id"  # Configuracion de Destinos
 
 # Instancia global para importar en otros lados
 config = Settings()

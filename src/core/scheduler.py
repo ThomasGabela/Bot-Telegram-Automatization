@@ -82,20 +82,16 @@ class Scheduler:
                 clean_id = item.strip()
                 if clean_id.lstrip('-').isdigit(): # Soporta negativos y positivos
                     admins.append(int(clean_id))
-
         # 2. Extraer bloque Publicar (antes Emisor)
-        # Busca: Publicar = [ ... ]  O  Emisor = [ ... ] (por compatibilidad)
-        pub_match = re.search(r'(?:Publicar|Emisor)\s*=\s*\[?(.*?)\]?', text, re.DOTALL | re.IGNORECASE)
-
+        pub_match = re.search(r'(?:Publicar|Emisor)\s*=\s*\[(.*?)\]', text, re.DOTALL | re.IGNORECASE)
         if pub_match:
             content = pub_match.group(1)
             clean_content = re.sub(r'#.*', '', content)
-            # Tomamos el primer número que encontremos
             for item in clean_content.replace(',', '\n').split('\n'):
                 clean_id = item.strip()
                 if clean_id.lstrip('-').isdigit():
                     publicar_id = int(clean_id)
-                    break # Solo necesitamos un canal principal
+                    break # Solo tomamos el primero
 
         return admins, publicar_id
 

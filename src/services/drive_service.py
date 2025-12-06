@@ -7,7 +7,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from src.config.settings import config
 from src.utils.logger import log
-import datetime
+from datetime import datetime
 
 class DriveService:
     def __init__(self):
