@@ -49,7 +49,7 @@ class ChatManager:
                 except Exception as e:
                     await message.reply_text(f"❌ Error: {e}")
                 return
-
+        # 1. Status
             if "status" == cmd or "ayuda" == cmd:
                 await message.reply_text(
                     "🤖 **SISTEMA ONLINE**"
@@ -57,6 +57,7 @@ class ChatManager:
                     "`reload` - Recarga manual de configuraciones desde Drive.\n"
                     "`mensaje [Carpeta]` - Envía manualmente el contenido de la carpeta especificada.\n"
                     "`carpetas` - Lista las carpetas/agencias disponibles en Drive.\n\n"
+                    "'Horarios' - Detalle de la programacion Activa y Desactivadas.\n\n"
                     "Para guardar captions, envía el nombre de la carpeta en la primera línea, en la segunda línea el mensaje (con emojis si quieres).\n"
                     "Ejemplo:\n"
                     "```\n"
@@ -66,6 +67,50 @@ class ChatManager:
                     )
                 return
 
+        # 2. HORARIOS (El reporte completo)
+            elif ["horarios", "horario", "programacion"] in cmd:
+                status_msg = await message.reply_text("🔎 Analizando programación vs Drive...")
+                
+                # Asegurar datos frescos
+                if not scheduler.schedule_map:
+                    await scheduler.load_daily_config()
+                
+                # Obtener datos
+                scheduled = scheduler.schedule_map # Diccionario {Carpeta: Hora}
+                drive_folders = drive_service.get_available_folders() # Lista ['CarpetaA', 'CarpetaB']
+                
+                report = ["**📅 REPORTE DE PROGRAMACIÓN**\n"]
+                processed_folders = [] # Para rastrear cuáles ya revisamos
+
+                # A. Revisar lo programado (Schedule)
+                if not scheduled:
+                    report.append("⚠️ El archivo `schedule` está vacío o no se leyó.")
+                else:
+                    for folder, time in scheduled.items():
+                        if folder in drive_folders:
+                            # ✅ Existe en config y en Drive
+                            report.append(f"✅ `{folder}` : {time}")
+                        else:
+                            # ❌ Existe en config pero NO en Drive (Error)
+                            report.append(f"❌ `{folder}` : {time} (Falta carpeta en Drive)")
+                        processed_folders.append(folder)
+
+                # B. Revisar lo NO programado (Sobrantes en Drive)
+                report.append("\n**📂 Carpetas Sin Programar (Aviso):**")
+                found_unscheduled = False
+                for f in drive_folders:
+                    if f not in processed_folders and f != "Settings":
+                        # ➖ Existe en Drive pero NO en config
+                        report.append(f"➖ `{f}`")
+                        found_unscheduled = True
+                
+                if not found_unscheduled:
+                    report.append("_Ninguna (Todo está cubierto)_")
+
+                await status_msg.edit_text("\n".join(report))
+                return
+
+            
             elif "carpetas" in cmd:
                 await message.reply_text("🔎 Buscando carpetas...")
                 folders = drive_service.get_available_folders()

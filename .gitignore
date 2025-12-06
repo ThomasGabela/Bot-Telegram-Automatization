@@ -21,3 +21,4 @@ data/
 # --- IDEs (Opcional) ---
 .vscode/
 .idea/
+uninstall.md
