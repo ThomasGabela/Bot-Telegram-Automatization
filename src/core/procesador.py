@@ -56,36 +56,44 @@ class Processor:
             media_files = []
             caption_text = ""
 
-            # 3. Clasificar (Soporte Docs activado)
+            # 3. Clasificar
             for f in files:
                 name = f['name'].lower()
                 mime = f['mimeType']
-                
-                # Es texto si termina en .txt O es un Google Doc
                 if name.startswith('caption') and (name.endswith('.txt') or mime == 'application/vnd.google-apps.document'):
                     caption_text = drive_service.get_text_content(f['id'])
                 elif 'image' in mime or 'video' in mime:
                     media_files.append(f)
 
-            if not media_files: raise Exception("No hay imágenes/video.")
+            if not media_files and not caption_text:
+                raise Exception("Carpeta vacía (ni texto ni media).")
             
             # 4. Procesar
             final_caption = self.process_text_emojis(caption_text)
             
-            # 5. Descargar Media (Toma el primero)
-            media = media_files[0]
-            local_path = drive_service.download_file(media['id'], media['name'])
-            if not local_path: raise Exception("Error descargando media.")
-
-            # 6. Enviar
+            # 4. Enviar
             try:
                 log.info(f"Enviando a {target_chat_id}...")
+                
+                # Caso A: Solo Texto
+                if not media_files:
+                    await telegram_service.client.send_message(target_chat_id, final_caption)
+                    log.info("✅ Mensaje de texto enviado.")
+                    return
+
+                # Caso B: Multimedia (Toma el primero)
+                media = media_files[0]
+                local_path = drive_service.download_file(media['id'], media['name'])
+                if not local_path: raise Exception("Error descarga media.")
+
                 if 'image' in media['mimeType']:
                     await telegram_service.client.send_photo(target_chat_id, photo=local_path, caption=final_caption)
                 elif 'video' in media['mimeType']:
                     await telegram_service.client.send_video(target_chat_id, video=local_path, caption=final_caption)
+                
                 os.remove(local_path)
-                log.info("✅ Enviado.")
+                log.info("✅ Multimedia enviado.")
+                
             except Exception as e:
                 log.error(f"Error Telegram: {e}")
                 raise e

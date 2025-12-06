@@ -7,6 +7,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from src.config.settings import config
 from src.utils.logger import log
+import datetime
 
 class DriveService:
     def __init__(self):
@@ -207,4 +208,31 @@ class DriveService:
             log.error(f"Error listando carpetas: {e}")
             return []
         
+    def save_to_inbox(self, content_string):
+        """Guarda mensaje en carpeta 'Buzon' (Task 3)"""
+        if not self.service: return False
+        
+        # 1. Buscar o Crear carpeta Buzon
+        buzon_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Buzon", is_folder=True, exact_match=True)
+        if not buzon_id:
+            meta = {'name': 'Buzon', 'parents': [config.DRIVE_ROOT_ID], 'mimeType': 'application/vnd.google-apps.folder'}
+            buzon = self.service.files().create(body=meta, fields='id').execute()
+            buzon_id = buzon.get('id')
+
+        # 2. Crear archivo con Timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_metadata = {
+            'name': f'Mensaje_{timestamp}',
+            'parents': [buzon_id],
+            'mimeType': 'application/vnd.google-apps.document'
+        }
+        media = MediaIoBaseUpload(io.BytesIO(content_string.encode('utf-8')), mimetype='text/plain', resumable=True)
+        
+        try:
+            self.service.files().create(body=file_metadata, media_body=media).execute()
+            return True
+        except Exception as e:
+            log.error(f"Error Buzon: {e}")
+            return False
+
 drive_service = DriveService()
