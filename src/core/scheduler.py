@@ -50,7 +50,7 @@ class Scheduler:
         today = datetime.now().strftime("%Y-%m-%d")
         
         with open(self.state_file, 'w') as f:
-            json.dump({"date": today, "published": self.published_log}, f)
+            json.dump({"date": today, "published": self.published_log}, f, indent=4)
             
         with open(self.config_cache_file, 'w') as f:
             json.dump({
@@ -58,7 +58,7 @@ class Scheduler:
                 "schedule": self.schedule_map,
                 "admins": self.admin_ids,
                 "emisor": self.target_channel_id
-            }, f)
+            }, f, indent=4)
 
     def _parse_custom_config(self, text):
         """
@@ -82,6 +82,7 @@ class Scheduler:
                 clean_id = item.strip()
                 if clean_id.lstrip('-').isdigit(): # Soporta negativos y positivos
                     admins.append(int(clean_id))
+        
         # 2. Extraer bloque Publicar (antes Emisor)
         pub_match = re.search(r'(?:Publicar|Emisor)\s*=\s*\[(.*?)\]', text, re.DOTALL | re.IGNORECASE)
         if pub_match:

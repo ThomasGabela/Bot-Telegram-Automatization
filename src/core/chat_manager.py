@@ -86,7 +86,8 @@ class ChatManager:
                     "━━━━━━━━━━━━━━━\n"
                     "✍️ **Guardar Caption:**\n"
                     "Línea 1: Nombre Carpeta\n"
-                    "Línea 2: Mensaje..."
+                    "Línea 2: Mensaje...\n"
+                    "Linea 3 o mas: Mas mensaje..."
                 )
                 return
 
@@ -132,7 +133,7 @@ class ChatManager:
                 return
 
         # 3. Carpetas (Carpetas disponibles)    
-            elif cmd in ["carpetas, carpeta"]:
+            elif cmd in ["carpetas", "carpeta"]:
                 await message.reply_text("🔎 Buscando carpetas...")
                 folders = drive_service.get_available_folders()
                 folders.remove("Settings") if "Settings" in folders else None
@@ -152,7 +153,8 @@ class ChatManager:
             
         # 5. "Mensaje [Carpeta] TEST MANUAL"
             if cmd.startswith("mensaje ") or cmd.startswith("run "):
-                folder_name = text[8:].strip() # Quitar "mensaje "
+                if cmd.startswith("run "): folder_name = text[4:].strip() # Quitar "run "
+                else: folder_name = text[8:].strip() # Quitar "mensaje "
                 await message.reply_text(f"🚀 Forzando envío de: `{folder_name}`...")
                 try:
                     await processor.execute_agency_post(folder_name, target_chat_id=message.chat.id)
@@ -199,8 +201,9 @@ class ChatManager:
         # Si llegamos aquí, no es comando y no es una carpeta válida.
         else:
             # Guardamos TODO el mensaje (incluyendo la primera linea) en Buzón
-            full_content = message.text.html 
-            ok = drive_service.save_to_inbox(full_content)
+            full_content = message.text.html
+            identifier = message.from_user.first_name + "_" + message.from_user.last_name
+            ok = drive_service.save_to_inbox(full_content, identifier=identifier)
             
             if ok:
                 await message.reply_text(

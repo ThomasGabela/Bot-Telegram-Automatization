@@ -208,21 +208,32 @@ class DriveService:
             log.error(f"Error listando carpetas: {e}")
             return []
         
-    def save_to_inbox(self, content_string):
+    def save_to_inbox(self, content_string, identifier=0):
         """Guarda mensaje en carpeta 'Buzon' (Task 3)"""
         if not self.service: return False
         
-        # 1. Buscar o Crear carpeta Buzon
-        buzon_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Buzon", is_folder=True, exact_match=True)
+        # 1. Obtener el ID de la carpeta 'Settings'
+        settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Settings", is_folder=True, exact_match=True)
+        if not settings_id:
+            log.error("❌ No se encontró la carpeta 'Settings' para ubicar el Buzón.")
+            return False
+
+        # 2. Buscar o Crear carpeta 'Buzon' DENTRO de 'Settings'
+        buzon_id = self.find_item_id_by_name(settings_id, "Buzon", is_folder=True, exact_match=True)
         if not buzon_id:
-            meta = {'name': 'Buzon', 'parents': [config.DRIVE_ROOT_ID], 'mimeType': 'application/vnd.google-apps.folder'}
+            meta = {
+                'name': 'Buzon', 
+                'parents': [settings_id], # <--- Aquí se vincula a Settings
+                'mimeType': 'application/vnd.google-apps.folder'
+            }
             buzon = self.service.files().create(body=meta, fields='id').execute()
             buzon_id = buzon.get('id')
-
-        # 2. Crear archivo con Timestamp
+            log.info("📂 Carpeta 'Buzon' creada dentro de 'Settings'.")
+            
+        # 3. Crear archivo con Timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         file_metadata = {
-            'name': f'Mensaje_{timestamp}',
+            'name': f'Mensaje_{timestamp} por_{identifier}',
             'parents': [buzon_id],
             'mimeType': 'application/vnd.google-apps.document'
         }
