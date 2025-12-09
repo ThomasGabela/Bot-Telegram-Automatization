@@ -155,44 +155,46 @@ class ChatManager:
                 return
             
         # 5. "Mensaje [Carpeta] [DD/MM] (Fecha opcional, default hoy)"
-        if cmd_lower.startswith("run ") or cmd_lower.startswith("mensaje "):
-            if cmd.startswith("run "): raw_args = text[4:].strip() # Quitar "run "
-            else: raw_args = text[8:].strip() # Quitar "mensaje 
-            
-            parts = raw_args.split()
-            folder_name = raw_args
-            target_date = None
-            
-            # Intentar detectar fecha al final
-            if len(parts) >= 2:
-                potential_date = parts[-1]
+            if cmd_lower.startswith("run ") or cmd.startswith("mensaje "):
+                if cmd.startswith("run "): raw_args = text[4:].strip() # Quitar "run "
+                else: raw_args = text[8:].strip() # Quitar "mensaje "
+                
+                parts = raw_args.split()
+                folder_name = raw_args
+                target_date = None
+                
+                # Intentar detectar fecha al final
+                if len(parts) >= 2:
+                    potential_date = parts[-1]
+                    try:
+                        # Parseamos DD/MM
+                        parsed = datetime.strptime(potential_date, "%d/%m")
+                        # Usamos el año actual porque al bot no le importa el año (solo busca la carpeta del mes)
+                        target_date = parsed.replace(year=datetime.now().year)
+                        
+                        # El nombre es todo menos la fecha
+                        folder_name = " ".join(parts[:-1])
+                    except ValueError:
+                        pass # No era fecha, es parte del nombre
+                
+                # Si no se especificó fecha, usamos HOY
+                final_date = target_date if target_date else datetime.now()
+                date_str = final_date.strftime("%d/%m")
+                
+                await message.reply_text(f"🚀 Ejecutando: `{folder_name}`\n📅 Fecha objetivo: `{date_str}`")
+                
                 try:
-                    # Parseamos DD/MM
-                    parsed = datetime.strptime(potential_date, "%d/%m")
-                    # Usamos el año actual porque al bot no le importa el año (solo busca la carpeta del mes)
-                    target_date = parsed.replace(year=datetime.now().year)
-                    
-                    # El nombre es todo menos la fecha
-                    folder_name = " ".join(parts[:-1])
-                except ValueError:
-                    pass # No era fecha, es parte del nombre
+                    await processor.execute_agency_post(
+                        folder_name, 
+                        target_chat_id=message.chat.id, 
+                        force_date=final_date
+                    )
+                    await message.reply_text("✅ Ejecución finalizada.")
+                    return
+                except Exception as e:
+                    await message.reply_text(f"❌ Error: {e}")
+                    return
             
-            # Si no se especificó fecha, usamos HOY
-            final_date = target_date if target_date else datetime.now()
-            date_str = final_date.strftime("%d/%m")
-            
-            await message.reply_text(f"🚀 Ejecutando: `{folder_name}`\n📅 Fecha objetivo: `{date_str}`")
-            
-            try:
-                await processor.execute_agency_post(
-                    folder_name, 
-                    target_chat_id=message.chat.id, 
-                    force_date=final_date
-                )
-                await message.reply_text("✅ Ejecución finalizada.")
-            except Exception as e:
-                await message.reply_text(f"❌ Error: {e}")
-                return
 
         # 6. Clear (Limpieza)   
             if cmd == "clear":
