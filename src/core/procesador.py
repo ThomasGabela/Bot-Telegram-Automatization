@@ -4,8 +4,9 @@ from src.services.drive_service import drive_service, MESES
 from src.services.telegram_service import telegram_service
 from src.config.settings import config
 from src.utils.logger import log
-from pyrogram.types import InputMediaPhoto, InputMediaVideo # <--- Necesario para álbumes
+from pyrogram.types import InputMediaPhoto, InputMediaVideo
 from datetime import datetime, timedelta
+from src.core.scheduler import scheduler
 class Processor:
     def __init__(self):
         self.emojis_map = {}
@@ -48,11 +49,17 @@ class Processor:
 
             # 1. Buscar carpeta
             agency_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, agency_folder_name, is_folder=True, exact_match=True)
-            if not agency_id: raise Exception(f"Carpeta '{agency_folder_name}' no encontrada.")
+            if not agency_id: 
+                msg = f"Carpeta '{agency_folder_name}' no encontrada."
+                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                raise Exception(msg)
 
             # 2. Listar contenido
             files = drive_service.list_files_in_folder(agency_id)
-            if not files: raise Exception("Carpeta vacía.")
+            if not files: 
+                msg = f"La carpeta '{agency_folder_name}' está vacía."
+                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                raise Exception(msg)
             files.sort(key=lambda x: x['name'])
             
             media_files = []
@@ -75,11 +82,17 @@ class Processor:
             
             # Buscar carpeta del Mes
             month_id = drive_service.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
-            if not month_id: raise Exception(f"No existe la carpeta del mes `{month_name}`.")
+            if not month_id: 
+                msg = f"No existe la carpeta del mes `{month_name}`."
+                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                raise Exception(msg)
             
             # Buscar carpeta del Día
             day_id = drive_service.find_item_id_by_name(month_id, day_str, is_folder=True, exact_match=True)
-            if not day_id: raise Exception(f"No existe la carpeta del día `{day_str}`.")
+            if not day_id: 
+                msg = f"No existe la carpeta del día `{day_str}`."
+                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                raise Exception(msg)
             
             # Listar contenido del DÍA
             day_files = drive_service.list_files_in_folder(day_id)
@@ -87,7 +100,10 @@ class Processor:
             
             media_files = [f for f in day_files if 'image' in f['mimeType'] or 'video' in f['mimeType']]
             
-            if not media_files and not caption_text: raise Exception("No hay archivos multimedia ni caption para enviar.")
+            if not media_files and not caption_text: 
+                msg = f"{agency_folder_name}: \nNo hay contenido multimedia ni caption para enviar."
+                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                raise Exception(msg)
             
             # 4. Procesar
             final_caption = self.process_text_emojis(caption_text)
@@ -99,10 +115,9 @@ class Processor:
                 
                 # No foto o No texto, no enviar nada
                 if not media_files or not final_caption:
-                    raise Exception(
-                        f"{agency_folder_name}: \n"
-                        "No hay contenido multimedia para enviar."
-                        )
+                    msg = f"{agency_folder_name}: \nNo hay contenido multimedia para enviar."
+                    telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                    raise Exception(msg)
                 
                 # Caso A: Solo Texto
                 if final_caption:
@@ -113,7 +128,10 @@ class Processor:
                 if len(media_files) == 1:
                     media = media_files[0]
                     local_path = drive_service.download_file(media['id'], media['name'])
-                    if not local_path: raise Exception("Error descarga media.")
+                    if not local_path: 
+                        msg = f"No se pudo descargar el archivo '{media['name']}'."
+                        telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                        raise Exception(msg)
                     local_paths.append(local_path)
                     
                     if 'image' in media['mimeType']:
