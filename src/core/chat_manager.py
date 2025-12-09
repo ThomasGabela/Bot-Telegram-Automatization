@@ -32,7 +32,7 @@ class ChatManager:
                     premium_emojis_found.append(f"`{html_code}` (ID: {e_id})")
             
             if premium_emojis_found:
-                response = "**💎 Emojis Premium Detectados:**\n" + "\n".join(premium_emojis_found)
+                response = "**💎 Emojis Premium Detectados:**\n" + f"Se han detectado: {(len(premium_emojis_found))} emojis premium en tu mensaje.\n\n"
                 await message.reply_text(response)
         # ----------------------------------
         lines = text.split('\n', 1)
@@ -83,6 +83,8 @@ class ChatManager:
                     "📅 `horarios` » Ver Programación\n"
                     "📨 `mensaje [Carpeta]` » Test envío\n"
                     "🔄 `reload` » Recargar Config\n"
+                    "🧽 `clear` » Limpia la pantalla de mensajes\n"
+                    "📂 `create [Nombre Agencia]` » Crear estructura Agencia/Mes/Día"
                     "━━━━━━━━━━━━━━━\n"
                     "✍️ **Guardar Caption:**\n"
                     "Línea 1: Nombre Carpeta\n"
@@ -169,6 +171,24 @@ class ChatManager:
                 msg = await message.reply_text(spacer)
                 return
 
+        # 7. CREATE
+            if cmd.startswith("create ") or cmd.startswith("crear "): # Soporte para typo
+                if cmd.startswith("create "): agency_name = text[7:].strip() # Quitar "create "
+                else: agency_name = text[6:].strip() # Quitar "crear "
+                if not agency_name:
+                    await message.reply_text("⚠️ Indica el nombre de la carpeta.\nEj: `create Poker`")
+                    return
+                
+                await message.reply_text(f"🏗️ Creando estructura para `{agency_name}`...\n(Esto puede tardar unos segundos)")
+                
+                # Ejecutar creación masiva
+                ok = drive_service.create_agency_structure(agency_name)
+                
+                if ok:
+                    await message.reply_text(f"✅ Carpeta `{agency_name}` creada con éxito.\nYa tiene subcarpetas para éste y el próximo mes.")
+                else:
+                    await message.reply_text("❌ Hubo un error creando las carpetas.")
+                return
     # --- BLOQUE DE GUARDADO (CAPTION O BUZÓN) ---
         
         # 1. Intentamos buscar la carpeta exacta en Drive
@@ -177,7 +197,7 @@ class ChatManager:
         # CASO: CARPETA EXISTE -> GUARDAR CAPTION
         if exists:
             # Validamos que no sea Settings ni Buzon
-            if first_line in ["Settings", "Buzon"]:
+            if first_line in ["Settings"]:
                 await message.reply_text("⚠️ No se puede escribir en carpetas de sistema.")
                 return
 

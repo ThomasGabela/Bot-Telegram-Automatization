@@ -1,5 +1,6 @@
 import io
 import os.path
+import calendar
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from google.auth.transport.requests import Request
@@ -7,7 +8,13 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from src.config.settings import config
 from src.utils.logger import log
-from datetime import datetime
+from datetime import datetime, timedelta
+
+# Mapeo de meses en español
+MESES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+}
 
 class DriveService:
     def __init__(self):
@@ -73,6 +80,99 @@ class DriveService:
             log.error(f"Error buscando '{item_name}': {e}")
             return None
 
+    def create_folder(self, folder_name, parent_id):
+        """Crea una carpeta y retorna su ID"""
+        meta = {
+            'name': folder_name,
+            'parents': [parent_id],
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        try:
+            file = self.service.files().create(body=meta, fields='id').execute()
+            return file.get('id')
+        except Exception as e:
+            log.error(f"Error creando carpeta {folder_name}: {e}")
+        return None
+
+    def create_agency_structure(self, agency_name):
+        """Crea Agencia -> Mes Actual/Siguiente -> Días (01-31)"""
+        root = config.DRIVE_ROOT_ID
+        
+        # 1. Crear Carpeta Agencia
+        agency_id = self.find_item_id_by_name(root, agency_name, is_folder=True, exact_match=True)
+        if agency_id:
+            log.info(f"Carpeta ya existente. Omitiendo proceso...")
+            return
+        else:
+            log.info(f"📂 Creando agencia: {agency_name}")
+            agency_id = self.create_folder(agency_name, root)
+        
+        # 2. Calcular Mes Actual y Siguiente
+        now = datetime.now()
+        dates_to_create = [now, (now.replace(day=1) + timedelta(days=32)).replace(day=1)]
+        
+        for date_obj in dates_to_create:
+            month_name = MESES[date_obj.month]
+            
+            # Crear Carpeta Mes
+            month_id = self.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
+            if not month_id:
+                month_id = self.create_folder(month_name, agency_id)
+            
+            # Crear Días
+            _, days_in_month = calendar.monthrange(date_obj.year, date_obj.month)
+            for day in range(1, days_in_month + 1):
+                day_str = f"{day:02d}" # 01, 02...
+                # Verificamos si existe para no duplicar (aunque Drive permite duplicados, mejor evitar)
+                if not self.find_item_id_by_name(month_id, day_str, is_folder=True, exact_match=True):
+                    self.create_folder(day_str, month_id)
+        return True
+
+    def run_monthly_maintenance(self):
+        """Mueve el mes pasado a Backlog"""
+        log.info("🧹 Ejecutando mantenimiento mensual...")
+        
+        # 1. Preparar Backlog
+        settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Settings", is_folder=True)
+        backlog_id = self.find_item_id_by_name(settings_id, "Backlog", is_folder=True)
+        
+        if not backlog_id:
+            backlog_id = self.create_folder("Backlog", settings_id)
+        
+        # 2. Limpiar Backlog (Borrar contenido previo)
+        try:
+            children = self.service.files().list(q=f"'{backlog_id}' in parents and trashed=false").execute()
+            for child in children.get('files', []):
+                self.service.files().update(fileId=child['id'], body={'trashed': True}).execute()
+            log.info("🗑️ Backlog limpiado.")
+        except Exception as e: log.error(f"Error limpiando backlog: {e}")
+
+        # 3. Identificar Mes Pasado
+        last_month_date = datetime.now().replace(day=1) - timedelta(days=1)
+        last_month_name = MESES[last_month_date.month]
+        
+        # 4. Recorrer Agencias y Mover
+        agencies = self.get_available_folders() # Lista de nombres
+        
+        for agency in agencies:
+            if agency in ["Settings", "Buzon"]: continue
+            
+            agency_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, agency, is_folder=True, exact_match=True)
+            month_folder_id = self.find_item_id_by_name(agency_id, last_month_name, is_folder=True, exact_match=True)
+            
+            if month_folder_id:
+                # Crear carpeta de Agencia dentro de Backlog
+                agency_bk_id = self.create_folder(agency, backlog_id)
+                
+                # Mover la carpeta del mes
+                # En Drive "mover" es cambiar el parent
+                self.service.files().update(
+                    fileId=month_folder_id,
+                    addParents=agency_bk_id,
+                    removeParents=agency_id
+                ).execute()
+                log.info(f"📦 Movido {agency}/{last_month_name} a Backlog.")
+                
     def get_text_content(self, file_id):
             """Descarga texto plano o Google Docs exportado"""
             if not file_id or not self.service: return ""

@@ -1,11 +1,11 @@
 import os
 import re
-from src.services.drive_service import drive_service
+from src.services.drive_service import drive_service, MESES
 from src.services.telegram_service import telegram_service
 from src.config.settings import config
 from src.utils.logger import log
 from pyrogram.types import InputMediaPhoto, InputMediaVideo # <--- Necesario para álbumes
-
+from datetime import datetime, timedelta
 class Processor:
     def __init__(self):
         self.emojis_map = {}
@@ -45,7 +45,7 @@ class Processor:
 
     async def execute_agency_post(self, agency_folder_name, target_chat_id="me"):
             log.info(f"🚀 Procesando agencia: {agency_folder_name}")
-            
+
             # 1. Buscar carpeta
             agency_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, agency_folder_name, is_folder=True, exact_match=True)
             if not agency_id: raise Exception(f"Carpeta '{agency_folder_name}' no encontrada.")
@@ -64,25 +64,41 @@ class Processor:
                 mime = f['mimeType']
                 if name.startswith('caption') and (name.endswith('.txt') or mime == 'application/vnd.google-apps.document'):
                     caption_text = drive_service.get_text_content(f['id'])
-                elif 'image' in mime or 'video' in mime:
-                    media_files.append(f)
-
-            if not media_files and not caption_text:
-                raise Exception("Carpeta vacía (ni texto ni media).")
+                    break # Solo necesitamos un caption
+            
+            # --- BUSCAR MULTIMEDIA (En la fecha de hoy) ---
+            now = datetime.now()
+            month_name = MESES[now.month]
+            day_str = f"{now.day:02d}" # Ej: 06
+        
+            # Buscar carpeta del Mes
+            month_id = drive_service.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
+            if not month_id: raise Exception(f"No existe la carpeta del mes `{month_name}`.")
+            
+            # Buscar carpeta del Día
+            day_id = drive_service.find_item_id_by_name(month_id, day_str, is_folder=True, exact_match=True)
+            if not day_id: raise Exception(f"No existe la carpeta del día `{day_str}`.")
+            
+            # Listar contenido del DÍA
+            day_files = drive_service.list_files_in_folder(day_id)
+            day_files.sort(key=lambda x: x['name']) # Ordenar 1, 2, 3
+            
+            media_files = [f for f in day_files if 'image' in f['mimeType'] or 'video' in f['mimeType']]
+            
+            if not media_files and not caption_text: raise Exception("No hay archivos multimedia ni caption para enviar.")
             
             # 4. Procesar
             final_caption = self.process_text_emojis(caption_text)
-            
-            # 4. Enviar
             local_paths = [] # Para borrar después
+            
+            # 5. Enviar
             try:
                 log.info(f"Enviando a {target_chat_id}...")
                 
                 # Caso A: Solo Texto
-                if not media_files:
+                if final_caption:
                     await telegram_service.client.send_message(target_chat_id, final_caption)
                     log.info("✅ Mensaje de texto enviado.")
-                    return
 
                 # Caso B: Un solo archivo (Foto o Video)
                 if len(media_files) == 1:
@@ -92,9 +108,9 @@ class Processor:
                     local_paths.append(local_path)
                     
                     if 'image' in media['mimeType']:
-                        await telegram_service.client.send_photo(target_chat_id, photo=local_path, caption=final_caption)
+                        await telegram_service.client.send_photo(target_chat_id, photo=local_path)
                     elif 'video' in media['mimeType']:
-                        await telegram_service.client.send_video(target_chat_id, video=local_path, caption=final_caption)
+                        await telegram_service.client.send_video(target_chat_id, video=local_path)
                     
                     log.info("✅ Archivo único enviado.")
                 
@@ -108,13 +124,10 @@ class Processor:
                         if not path: continue
                         local_paths.append(path)
 
-                        # El caption solo se adjunta al PRIMER elemento del álbum para que salga abajo
-                        cap = final_caption if index == 0 else ""
-
                         if 'image' in media['mimeType']:
-                            input_media_group.append(InputMediaPhoto(path, caption=cap))
+                            input_media_group.append(InputMediaPhoto(path))
                         elif 'video' in media['mimeType']:
-                            input_media_group.append(InputMediaVideo(path, caption=cap))
+                            input_media_group.append(InputMediaVideo(path))
 
                     if input_media_group:
                         await telegram_service.client.send_media_group(target_chat_id, media=input_media_group)

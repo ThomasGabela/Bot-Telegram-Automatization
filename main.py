@@ -13,7 +13,7 @@ from src.core.chat_manager import chat_manager
 from src.core.scheduler import scheduler
 from src.utils.logger import log
 from pyrogram import idle
-
+from datetime import datetime
 async def scheduler_loop():
     """
     Bucle infinito que revisa el reloj cada minuto.
@@ -44,6 +44,13 @@ async def main():
     task_scheduler = asyncio.create_task(scheduler_loop())
     
     log.info("🤖 Bot escuchando comandos y horarios...")
+    
+    #4. Notificación de Inicio (NUEVO)
+    try:
+        startup_msg = f"📅{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot Iniciado Correctamente**"
+        await telegram_service.send_message_to_me(startup_msg)
+    except Exception as e:
+        log.error(f"No se pudo enviar mensaje de inicio: {e}")
     
     # Mantener corriendo
     await idle()

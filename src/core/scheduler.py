@@ -141,6 +141,18 @@ class Scheduler:
                 if folder not in self.published_log:
                     await self._trigger_publication(folder)
 
+        # --- MANTENIMIENTO MENSUAL ---
+            # Si es el día 1 del mes, ejecutamos limpieza
+        if now.day == 1:
+            log.info("🗓️ Es día 1. Iniciando limpieza de Backlog...")
+            # Lo corremos en un thread aparte para no bloquear el bot si tarda mucho
+            # O simplemente lo llamamos directo si confiamos en la velocidad
+            try:
+                drive_service.run_monthly_maintenance()
+            except Exception as e:
+                log.error(f"Fallo en mantenimiento mensual: {e}")
+            # -----------------------------
+
     async def _trigger_publication(self, folder):
         if not self.target_channel_id:
             log.error(f"❌ No hay ID 'Emisor' configurado para enviar '{folder}'.")
