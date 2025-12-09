@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from src.services.drive_service import drive_service
 from src.services.telegram_service import telegram_service
-from src.core.procesador import processor
+
 from src.config.settings import config
 from src.utils.logger import log
 
@@ -167,6 +167,8 @@ class Scheduler:
             # -----------------------------
 
     async def _trigger_publication(self, folder):
+        from src.core.procesador import processor
+        
         if not self.target_channel_id:
             log.error(f"❌ No hay ID 'Emisor' configurado para enviar '{folder}'.")
             return

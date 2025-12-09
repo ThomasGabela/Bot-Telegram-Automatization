@@ -7,6 +7,8 @@ from src.utils.logger import log
 from pyrogram.types import InputMediaPhoto, InputMediaVideo
 from datetime import datetime, timedelta
 from src.core.scheduler import scheduler
+
+
 class Processor:
     def __init__(self):
         self.emojis_map = {}
