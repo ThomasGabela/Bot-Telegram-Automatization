@@ -21,7 +21,7 @@ class Settings:
     DATA_DIR = os.path.join(BASE_DIR, "data") # Carpeta para persistencia local
     
     # Config
-    CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL_MINUTES", 15))
+    CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL_MINUTES", 1))
     
     # Email (opcional)
     EMAIL_SENDER = os.getenv("EMAIL_SENDER")

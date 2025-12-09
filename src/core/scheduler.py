@@ -100,7 +100,7 @@ class Scheduler:
         log.info("📥 Descargando config de Drive...")
         
         # Buscar carpeta Settings
-        settings_folder_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, "Settings", is_folder=True)
+        settings_folder_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, "末Settings", is_folder=True)
         if not settings_folder_id:
             log.error("❌ No se encontró carpeta Settings.")
             return

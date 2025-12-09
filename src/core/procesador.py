@@ -43,7 +43,7 @@ class Processor:
             
         return processed_text
 
-    async def execute_agency_post(self, agency_folder_name, target_chat_id="me"):
+    async def execute_agency_post(self, agency_folder_name, target_chat_id="me", force_date=None):
             log.info(f"🚀 Procesando agencia: {agency_folder_name}")
 
             # 1. Buscar carpeta
@@ -67,10 +67,12 @@ class Processor:
                     break # Solo necesitamos un caption
             
             # --- BUSCAR MULTIMEDIA (En la fecha de hoy) ---
-            now = datetime.now()
-            month_name = MESES[now.month]
-            day_str = f"{now.day:02d}" # Ej: 06
-        
+            target = force_date if force_date else datetime.now()
+            month_name = MESES[target.month]
+            day_str = f"{target.day:02d}" # Ej: 06
+            
+            log.info(f"📅 Buscando en: {agency_folder_name}/{month_name}/{day_str}")
+            
             # Buscar carpeta del Mes
             month_id = drive_service.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
             if not month_id: raise Exception(f"No existe la carpeta del mes `{month_name}`.")
