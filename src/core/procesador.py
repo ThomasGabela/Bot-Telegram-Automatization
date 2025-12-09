@@ -95,6 +95,13 @@ class Processor:
             try:
                 log.info(f"Enviando a {target_chat_id}...")
                 
+                # No foto o No texto, no enviar nada
+                if not media_files or not final_caption:
+                    raise Exception(
+                        f"{agency_folder_name}: \n"
+                        "No hay contenido multimedia para enviar."
+                        )
+                
                 # Caso A: Solo Texto
                 if final_caption:
                     await telegram_service.client.send_message(target_chat_id, final_caption)
@@ -133,7 +140,8 @@ class Processor:
                         await telegram_service.client.send_media_group(target_chat_id, media=input_media_group)
                         log.info("✅ Álbum enviado.")
                     else:
-                        raise Exception("No se pudieron procesar los archivos del álbum.")
+                        pass 
+                    # Exception("No se pudieron procesar los archivos del álbum.")
                 
             except Exception as e:
                 log.error(f"Error Telegram: {e}")

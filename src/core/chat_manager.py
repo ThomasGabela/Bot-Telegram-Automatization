@@ -222,7 +222,7 @@ class ChatManager:
         else:
             # Guardamos TODO el mensaje (incluyendo la primera linea) en Buzón
             full_content = message.text.html
-            identifier = message.from_user.first_name + "_" + message.from_user.last_name
+            identifier = message.from_user.first_name if message.from_user else "Desconocido"
             ok = drive_service.save_to_inbox(full_content, identifier=identifier)
             
             if ok:
