@@ -53,14 +53,14 @@ class Processor:
             agency_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, agency_folder_name, is_folder=True, exact_match=True)
             if not agency_id: 
                 msg = f"Carpeta '{agency_folder_name}' no encontrada."
-                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
 
             # 2. Listar contenido
             files = drive_service.list_files_in_folder(agency_id)
             if not files: 
                 msg = f"La carpeta '{agency_folder_name}' está vacía."
-                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
             files.sort(key=lambda x: x['name'])
             
@@ -86,14 +86,14 @@ class Processor:
             month_id = drive_service.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
             if not month_id: 
                 msg = f"No existe la carpeta del mes `{month_name}`."
-                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
             
             # Buscar carpeta del Día
             day_id = drive_service.find_item_id_by_name(month_id, day_str, is_folder=True, exact_match=True)
             if not day_id: 
                 msg = f"No existe la carpeta del día `{day_str}`."
-                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
             
             # Listar contenido del DÍA
@@ -104,7 +104,7 @@ class Processor:
             
             if not media_files and not caption_text: 
                 msg = f"{agency_folder_name}: \nNo hay contenido multimedia ni caption para enviar."
-                telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
             
             # 4. Procesar
@@ -118,7 +118,7 @@ class Processor:
                 # No foto o No texto, no enviar nada
                 if not media_files or not final_caption:
                     msg = f"{agency_folder_name}: \nNo hay contenido multimedia para enviar."
-                    telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                    await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                     raise Exception(msg)
                 
                 # Caso A: Solo Texto
@@ -132,7 +132,7 @@ class Processor:
                     local_path = drive_service.download_file(media['id'], media['name'])
                     if not local_path: 
                         msg = f"No se pudo descargar el archivo '{media['name']}'."
-                        telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                        await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                         raise Exception(msg)
                     local_paths.append(local_path)
                     

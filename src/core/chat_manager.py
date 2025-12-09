@@ -124,7 +124,7 @@ class ChatManager:
                 report.append("\n**📂 Carpetas Sin Programar (Aviso):**")
                 found_unscheduled = False
                 for f in drive_folders:
-                    if f not in processed_folders and f != "Settings":
+                    if f not in processed_folders and f != "末Settings":
                         # ➖ Existe en Drive pero NO en config
                         report.append(f"➖ `{f}`")
                         found_unscheduled = True
@@ -139,7 +139,7 @@ class ChatManager:
             elif cmd in ["carpetas", "carpeta"]:
                 await message.reply_text("🔎 Buscando carpetas...")
                 folders = drive_service.get_available_folders()
-                folders.remove("Settings") if "Settings" in folders else None
+                folders.remove("末Settings") if "末Settings" in folders else None
                 if folders:
                     list_text = "\n".join([f"📂 `{f}`" for f in folders])
                     await message.reply_text(f"**Carpetas Disponibles:**\n\n{list_text}")
@@ -228,7 +228,7 @@ class ChatManager:
         # CASO: CARPETA EXISTE -> GUARDAR CAPTION
         if exists:
             # Validamos que no sea Settings ni Buzon
-            if first_line in ["Settings"]:
+            if first_line in ["末Settings"]:
                 await message.reply_text("⚠️ No se puede escribir en carpetas de sistema.")
                 return
 

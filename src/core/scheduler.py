@@ -2,7 +2,7 @@ import time
 import json
 import re
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.services.drive_service import drive_service
 from src.services.telegram_service import telegram_service
 
@@ -141,7 +141,7 @@ class Scheduler:
     async def check_and_run(self):
         now = datetime.now()
         today = now.strftime("%Y-%m-%d")
-        curr_time = now.strftime("%H:%M")
+        curr_time = (now - timedelta(hours=3)).strftime("%H:%M") # Ajuste UTC-3
 
         if self.current_date != today:
             self.current_date = today
