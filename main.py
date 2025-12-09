@@ -45,10 +45,11 @@ async def main():
     
     log.info("🤖 Bot escuchando comandos y horarios...")
     
-    #4. Notificación de Inicio (NUEVO)
+    #4. Notificación de Inicio
     try:
+        target_chat = scheduler.alert_channel_id if scheduler.alert_channel_id else "me"
         startup_msg = f"📅{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot Iniciado Correctamente**"
-        await telegram_service.send_message_to_me(startup_msg)
+        await telegram_service.send_message_to_me(startup_msg, destiny_chat_id=target_chat)
     except Exception as e:
         log.error(f"No se pudo enviar mensaje de inicio: {e}")
     

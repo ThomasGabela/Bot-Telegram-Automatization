@@ -62,11 +62,11 @@ class TelegramService:
         self.client.add_handler(new_handler)
         log.info("👂 Handler registrado: Escuchando comandos de texto.")
 
-    async def send_message_to_me(self, text):
+    async def send_message_to_me(self, text, destiny_chat_id="me"):
         if not self.client or not self.is_connected:
             return
         try:
-            await self.client.send_message("me", text)
+            await self.client.send_message(destiny_chat_id, text)
         except Exception as e:
             log.error(f"Error enviando mensaje: {e}")
 

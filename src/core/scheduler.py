@@ -43,6 +43,7 @@ class Scheduler:
                         self.schedule_map = data.get("schedule", {})
                         self.admin_ids = data.get("admins", [])
                         self.target_channel_id = data.get("emisor", None)
+                        self.alert_channel_id = data.get("alert", None)
                         log.info("🔄 Configuración cargada desde caché local.")
             except: pass
 
@@ -57,7 +58,8 @@ class Scheduler:
                 "date": today, 
                 "schedule": self.schedule_map,
                 "admins": self.admin_ids,
-                "emisor": self.target_channel_id
+                "emisor": self.target_channel_id,
+                "alert": self.alert_channel_id
             }, f, indent=4)
 
     def _parse_custom_config(self, text):
@@ -65,10 +67,12 @@ class Scheduler:
         Parsea el formato:
         Admins = [ 123 #com, 456 ]
         Publicar = [ -100123 ]
+        Aviso = [...]
         """
         admins = []
         publicar_id = None
-
+        alert_id = None
+        
         if not text:
             return admins, publicar_id
 
@@ -93,8 +97,17 @@ class Scheduler:
                 if clean_id.lstrip('-').isdigit():
                     publicar_id = int(clean_id)
                     break # Solo tomamos el primero
-
-        return admins, publicar_id
+        
+        # 3. Aviso (Alertas)
+        match = re.search(r'(?:Aviso|Alerta)\s*=\s*\[(.*?)\]', text, re.DOTALL | re.IGNORECASE)
+        if match:
+            content = re.sub(r'#.*', '', match.group(1))
+            for item in content.replace(',', '\n').split('\n'):
+                if item.strip().lstrip('-').isdigit():
+                    alert_id = int(item.strip())
+                    break
+        
+        return admins, publicar_id, alert_id
 
     async def load_daily_config(self):
         log.info("📥 Descargando config de Drive...")
@@ -120,7 +133,7 @@ class Scheduler:
                 self.schedule_map[parts[0].strip()] = parts[1].strip().zfill(5)
 
         # 2. Parsear Chat IDs (Admins y Emisor)
-        self.admin_ids, self.target_channel_id = self._parse_custom_config(raw_chat_ids)
+        self.admin_ids, self.target_channel_id, self.alert_channel_id = self._parse_custom_config(raw_chat_ids)
 
         log.info(f"✅ Config cargada: {len(self.schedule_map)} tareas | {len(self.admin_ids)} admins | Emisor: {self.target_channel_id}")
         self._save_state()

@@ -192,7 +192,7 @@ class ChatManager:
                 await message.reply_text("✅ Ejecución finalizada.")
             except Exception as e:
                 await message.reply_text(f"❌ Error: {e}")
-            return
+                return
 
         # 6. Clear (Limpieza)   
             if cmd == "clear":
