@@ -44,34 +44,56 @@ class ChatManager:
         if len(lines) == 1:
             cmd = lines[0].lower().strip()
         
-        #0 Buscador de ID (oculto)
+        # 1. COMANDO ID (MEJORADO: SOPORTE EXACTO)
             if cmd_lower.startswith("id "):
-                search_query = text[3:].strip() # Lo que sigue después de "id "
-            
-                # Caso A: ID me (Tu propio ID)
-                if search_query.lower() == "me":
+                query = text[3:].strip() # Lo que sigue después de "id "
+                
+                # CASO A: ID ME
+                if query.lower() == "me":
                     me = await client.get_me()
                     await message.reply_text(f"🆔 **Tu ID (Host):** `{me.id}`")
                     return
 
-                # Caso B: Buscar Chat por Nombre
-                await message.reply_text(f"🔎 Buscando chat que contenga: *'{search_query}'*...")
+                # CASO B: RESOLUCIÓN EXACTA (Username o Link)
+                # Si tiene @, t.me/ o es una sola palabra sin espacios (posible username)
+                if "@" in query or "t.me/" in query or " " not in query:
+                    try:
+                        # Limpiamos el link para dejar solo el username
+                        clean_query = query
+                        if "t.me/" in clean_query:
+                            clean_query = clean_query.split("t.me/")[-1].replace("/", "")
+                        
+                        # Llamada directa a la API (Infalible)
+                        chat = await client.get_chat(clean_query)
+                        
+                        await message.reply_text(
+                            f"🎯 **Objetivo Exacto Encontrado**\n"
+                            f"📌 Título: `{chat.title}`\n"
+                            f"🆔 ID: `{chat.id}`\n"
+                            f"🔗 Username: @{chat.username or 'N/A'}\n"
+                            f"Use este ID en su archivo de configuración."
+                        )
+                        return
+                    except Exception as e:
+                        # Si falla (ej: usuario no existe), seguimos a la búsqueda fuzzy
+                        pass
+
+                # CASO C: BÚSQUEDA POR NOMBRE (Fuzzy en chats abiertos)
+                await message.reply_text(f"🔎 Buscando en tus chats activos: *'{query}'*...")
                 found_chats = []
-            
-                # Iterar sobre los diálogos (chats abiertos)
+                
                 async for dialog in client.get_dialogs():
                     chat_title = dialog.chat.title or dialog.chat.first_name or ""
-                    if search_query.lower() in chat_title.lower():
-                        chat_type = str(dialog.chat.type).split('.')[-1] # PRIVATE, SUPERGROUP, etc
+                    if query.lower() in chat_title.lower():
+                        chat_type = str(dialog.chat.type).split('.')[-1]
                         found_chats.append(f"📌 **{chat_title}**\n🆔 `{dialog.chat.id}` ({chat_type})")
                         
-                        # Límite para no saturar si hay muchos
                         if len(found_chats) >= 5: break
-            
+                
                 if found_chats:
                     await message.reply_text("\n\n".join(found_chats))
                 else:
-                    await message.reply_text("❌ No encontré ningún chat con ese nombre en tu lista reciente.")
+                    await message.reply_text("❌ No encontrado en tus chats recientes ni por username.")
                 return
 
         # 1. Status
@@ -195,7 +217,6 @@ class ChatManager:
                     await message.reply_text(f"❌ Error: {e}")
                     return
             
-
         # 6. Clear (Limpieza)   
             if cmd == "clear":
                 spacer = ".\n" + ("\n" * 50) + "." 
