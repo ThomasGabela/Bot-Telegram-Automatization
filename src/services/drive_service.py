@@ -287,7 +287,7 @@ class DriveService:
                 ).execute()
                 log.info(f"📦 Movido {agency}/{last_month_name} a Backlog.")
                 
-    async def get_text_content(self, file_id):
+    def get_text_content(self, file_id):
             """Descarga texto plano o Google Docs exportado"""
             if not file_id or not self.service: return ""
             count_errors = 0
@@ -323,27 +323,27 @@ class DriveService:
                 
                 if isinstance(e, HttpError) or e.resp.status in [500, 502, 503, 504]:
                     log.warning(f"Error de servidor {e.resp.status} al leer {file_id}, reintentando...")
-                    await TelegramService.send_message_to_me(
-                        f"⚠️ Error de servidor {e.resp.status} al leer archivo {file_id}, reintentando...",
-                        destiny_chat_id= scheduler.alert_channel_id
-                    )
+                    # await TelegramService.send_message_to_me(
+                    #     f"⚠️ Error de servidor {e.resp.status} al leer archivo {file_id}, reintentando...",
+                    #     destiny_chat_id= scheduler.alert_channel_id
+                    # )
                     
                     #Maximo 3 intentos
                     count_errors += 1
                     if count_errors >= 3: 
                         log.error(f"Error leyendo archivo {file_id} después de 3 intentos: {e}")
-                        await TelegramService.send_message_to_me(
-                            f"❌ Error leyendo archivo {file_id} después de 3 intentos: {e}",
-                            destiny_chat_id= scheduler.alert_channel_id
-                        )
+                        # await TelegramService.send_message_to_me(
+                        #     f"❌ Error leyendo archivo {file_id} después de 3 intentos: {e}",
+                        #     destiny_chat_id= scheduler.alert_channel_id
+                        # )
                         return ""
                     return self.get_text_content(file_id)
                 else:
                     log.error(f"Error leyendo archivo {file_id}: {e}")
-                    await TelegramService.send_message_to_me(
-                        f"❌ Error leyendo archivo {file_id}: {e}",
-                        destiny_chat_id= scheduler.alert_channel_id
-                    )
+                    # await TelegramService.send_message_to_me(
+                    #     f"❌ Error leyendo archivo {file_id}: {e}",
+                    #     destiny_chat_id= scheduler.alert_channel_id
+                    # )
                     return ""
             
 
