@@ -5,9 +5,9 @@ from src.services.telegram_service import telegram_service
 from src.config.settings import config
 from src.utils.logger import log
 from pyrogram.types import InputMediaPhoto, InputMediaVideo
-from datetime import datetime, timedelta
 from src.core.scheduler import scheduler
-
+from hachoir.metadata import extractMetadata
+from hachoir.parser import createParser
 
 class Processor:
     def __init__(self):
@@ -45,6 +45,33 @@ class Processor:
             processed_text = processed_text.replace(alias, html_tag)
             
         return processed_text
+
+    def get_video_attributes(self, file_path):
+        """
+        Extrae ancho, alto y duración para que iPhone no aplaste el video.
+        """
+        width = 0
+        height = 0
+        duration = 0
+        try:
+            parser = createParser(file_path)
+            if not parser:
+                return 0, 0, 0
+            
+            metadata = extractMetadata(parser)
+            if not metadata:
+                return 0, 0, 0
+
+            # Extraer datos
+            if metadata.has("width"): width = metadata.get("width")
+            if metadata.has("height"): height = metadata.get("height")
+            if metadata.has("duration"): duration = metadata.get("duration").seconds
+
+            log.info(f"📏 Metadatos video: {width}x{height} | {duration}s")
+            return width, height, duration
+        except Exception as e:
+            log.warning(f"⚠️ No se pudieron leer metadatos de video: {e}")
+            return 0, 0, 0
 
     async def execute_agency_post(self, agency_folder_name, target_chat_id="me", force_date=None):
             log.info(f"🚀 Procesando agencia: {agency_folder_name}")
@@ -139,7 +166,17 @@ class Processor:
                     if 'image' in media['mimeType']:
                         await telegram_service.client.send_photo(target_chat_id, photo=local_path)
                     elif 'video' in media['mimeType']:
-                        await telegram_service.client.send_video(target_chat_id, video=local_path)
+                        # FIX IPHONE: Inyectar metadatos
+                        w, h, dur = self.get_video_attributes(path)
+                        await telegram_service.client.send_video(
+                            target_chat_id, 
+                            video=path,
+                            width=w, 
+                            height=h, 
+                            duration=dur,
+                            supports_streaming=True
+                        )
+                        log.info("✅ Multimedia única enviada.")
                     
                     log.info("✅ Archivo único enviado.")
                 
@@ -148,7 +185,7 @@ class Processor:
                     input_media_group = []
                     log.info(f"📚 Preparando álbum de {len(media_files)} archivos...")
 
-                    for index, media in enumerate(media_files):
+                    for media in media_files:
                         path = drive_service.download_file(media['id'], media['name'])
                         if not path: continue
                         local_paths.append(path)
@@ -156,10 +193,21 @@ class Processor:
                         if 'image' in media['mimeType']:
                             input_media_group.append(InputMediaPhoto(path))
                         elif 'video' in media['mimeType']:
-                            input_media_group.append(InputMediaVideo(path))
-
+                                # FIX IPHONE: Inyectar metadatos en el álbum
+                                w, h, dur = self.get_video_attributes(path)
+                                input_media_group.append(InputMediaVideo(
+                                    path, 
+                                    width=w, 
+                                    height=h, 
+                                    duration=dur,
+                                    supports_streaming=True
+                                ))
                     if input_media_group:
                         await telegram_service.client.send_media_group(target_chat_id, media=input_media_group)
+                        await telegram_service.client.send_message(
+                            scheduler.alert_channel_id,
+                            f"📅{config.NOW.strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot** \n{agency_folder_name}: Álbum de {len(input_media_group)} archivos enviado."
+                            )
                         log.info("✅ Álbum enviado.")
                     else:
                         pass 
