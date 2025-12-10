@@ -16,6 +16,10 @@ MESES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
     7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
 }
+# IDs de Paleta de Drive (Estándar)
+COLOR_VERDE = "#16a765" # ID 4 (Verde)
+COLOR_ROJO = "#ac725e"  # ID 11 (Rojo Chocolate - El estándar de error en Drive)
+
 
 class DriveService:
     def __init__(self):
@@ -80,6 +84,114 @@ class DriveService:
         except Exception as e:
             log.error(f"Error buscando '{item_name}': {e}")
             return None
+
+# --- MOTOR DE AUDITORÍA OPTIMIZADO (BATCH) ---
+    def run_visual_audit(self):
+        """
+        Versión Ultra-Rápida usando Batch Requests.
+        Reduce cientos de llamadas HTTP a solo unas pocas por agencia.
+        """
+        log.info("🎨 Iniciando Auditoría Inteligente (Batch Mode)...")
+        
+        agencies = self.get_available_folders()
+        root = config.DRIVE_ROOT_ID
+        
+        # Meses a auditar (Actual y Siguiente)
+        now = config.NOW
+        months_to_check = [MESES[now.month], MESES[(now.replace(day=1) + timedelta(days=32)).month]]
+
+        for agency_name in agencies:
+            if agency_name in ["末Settings"]: continue
+            
+            agency_id = self.find_item_id_by_name(root, agency_name, is_folder=True, exact_match=True)
+            if not agency_id: continue
+
+            for m_name in months_to_check:
+                m_id = self.find_item_id_by_name(agency_id, m_name, is_folder=True, exact_match=True)
+                if not m_id: continue
+
+                # 1. Obtener Días y su Color Actual (1 Llamada)
+                # Traemos 'folderColorRgb' para comparar y no actualizar si no hace falta
+                q_days = f"'{m_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+                days_res = self.service.files().list(q=q_days, fields="files(id, name, folderColorRgb)").execute()
+                days_folders = days_res.get('files', [])
+
+                if not days_folders: continue
+
+                # Diccionario para guardar resultados del batch
+                # Estructura: { day_id: file_count }
+                counts_map = {} 
+
+                # Callback para procesar cada respuesta del lote
+                def callback_count(request_id, response, exception):
+                    if exception:
+                        log.error(f"Error contando en lote: {exception}")
+                    else:
+                        # request_id lo usaremos para mapear al folder ID real
+                        # response['files'] es la lista de archivos
+                        count = len(response.get('files', []))
+                        counts_map[request_id] = count
+
+                # 2. Preparar LOTE de Conteos (Batch Request)
+                batch_count = self.service.new_batch_http_request(callback=callback_count)
+                
+                valid_day_ids = [] # Guardamos IDs para iterar luego
+
+                for day in days_folders:
+                    d_id = day['id']
+                    valid_day_ids.append(d_id)
+                    
+                    # Query ligera: Solo IDs, max 20 resultados (suficiente para saber si es 6 o no)
+                    # Usamos el ID de la carpeta como 'request_id' para el callback
+                    q_files = f"'{d_id}' in parents and (mimeType contains 'image/' or mimeType contains 'video/') and trashed = false"
+                    req = self.service.files().list(q=q_files, pageSize=20, fields="files(id)")
+                    batch_count.add(req, request_id=d_id)
+
+                # Ejecutar 30 consultas en 1 sola transmisión HTTP
+                try:
+                    batch_count.execute()
+                except Exception as e:
+                    log.error(f"Fallo al ejecutar batch de conteo: {e}")
+                    continue
+
+                # 3. Analizar y Preparar LOTE de Actualizaciones (Solo cambios necesarios)
+                batch_update = self.service.new_batch_http_request()
+                updates_queued = 0
+                days_updated = []
+                
+                for day in days_folders:
+                    d_id = day['id']
+                    current_color = day.get('folderColorRgb', '').lower() # Drive devuelve Hex a veces
+                    count = counts_map.get(d_id, 0)
+
+                    # Lógica de Negocio: 6 archivos = Verde, Otro = Rojo
+                    target_color = COLOR_VERDE if count == config.MULTIMEDIA_COUNT else COLOR_ROJO
+                    
+                    # log.info(f" - {agency_name}/{m_name}/{day['name']}: {count} archivos -> Target_Color {target_color} | Actual_Color {current_color}")
+                    # Normalización simple para comparar (Drive a veces no devuelve color si es default)
+                    # Si el color ya es el correcto, saltamos (Ahorro de API)
+                    if current_color == target_color.lower():
+                        continue
+
+                    # Si es diferente, encolamos actualización
+                    # Usamos folderColorRgb con el Hex exacto
+                    body = {'folderColorRgb': target_color}
+                    req = self.service.files().update(fileId=d_id, body=body, fields='id')
+                    batch_update.add(req)
+                    updates_queued += 1
+                    days_updated.append(day['name'])
+
+                # 4. Ejecutar actualizaciones (si las hay)
+                if updates_queued > 0:
+                    try:
+                        batch_update.execute()
+                        log.info(f"🎨 Actualizadas {updates_queued} carpetas en {agency_name}/{m_name}/{days_updated}")
+                    except Exception as e:
+                        log.error(f"Error batch update: {e}")
+                else:
+                    log.info(f"🎨 No se requieren actualizaciones de Auditoria en {agency_name}/{m_name}")
+                
+        log.info("✅ Auditoría Visual Finalizada.")
 
     def create_folder(self, folder_name, parent_id):
         """Crea una carpeta y retorna su ID"""

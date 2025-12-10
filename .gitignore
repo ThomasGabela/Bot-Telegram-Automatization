@@ -17,6 +17,7 @@ downloads/
 logs/
 test/
 data/
+test_main.py
 
 # --- IDEs (Opcional) ---
 .vscode/

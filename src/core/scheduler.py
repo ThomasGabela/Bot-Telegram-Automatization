@@ -141,7 +141,16 @@ class Scheduler:
         now = config.NOW
         today = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
-
+        # 1. Auditoría Visual (Minuto 20 y 50)
+        if now.minute in [20, 50]:
+            # Ejecutamos en segundo plano (sin await bloqueante estricto o confiando en la rapidez)
+            # Para Python simple, lo llamamos directo. Drive API es rápida listando IDs.
+            try:
+                log.info("🔍 Iniciando auditoría visual de carpetas...")
+                drive_service.run_visual_audit()
+            except Exception as e:
+                log.error(f"Error auditoría visual: {e}")
+                
         if self.current_date != today:
             self.current_date = today
             self.published_log = []
