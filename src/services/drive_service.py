@@ -314,7 +314,7 @@ class DriveService:
         if not self.service: return False
         
         # 1. Obtener el ID de la carpeta 'Settings'
-        settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Settings", is_folder=True, exact_match=True)
+        settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "末Settings", is_folder=True, exact_match=True)
         if not settings_id:
             log.error("❌ No se encontró la carpeta 'Settings' para ubicar el Buzón.")
             return False
