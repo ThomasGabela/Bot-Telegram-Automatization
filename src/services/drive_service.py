@@ -9,6 +9,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from src.config.settings import config
 from src.utils.logger import log
 from datetime import datetime, timedelta
+from src.config.settings import config
 
 # Mapeo de meses en español
 MESES = {
@@ -108,7 +109,7 @@ class DriveService:
             agency_id = self.create_folder(agency_name, root)
         
         # 2. Calcular Mes Actual y Siguiente
-        now = datetime.now()
+        now = config.NOW
         dates_to_create = [now, (now.replace(day=1) + timedelta(days=32)).replace(day=1)]
         
         for date_obj in dates_to_create:
@@ -148,7 +149,7 @@ class DriveService:
         except Exception as e: log.error(f"Error limpiando backlog: {e}")
 
         # 3. Identificar Mes Pasado
-        last_month_date = datetime.now().replace(day=1) - timedelta(days=1)
+        last_month_date = config.NOW.replace(day=1) - timedelta(days=1)
         last_month_name = MESES[last_month_date.month]
         
         # 4. Recorrer Agencias y Mover
@@ -331,7 +332,7 @@ class DriveService:
             log.info("📂 Carpeta 'Buzon' creada dentro de 'Settings'.")
             
         # 3. Crear archivo con Timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = config.NOW.strftime("%Y-%m-%d_%H-%M-%S")
         file_metadata = {
             'name': f'Mensaje_{timestamp} por_{identifier}',
             'parents': [buzon_id],

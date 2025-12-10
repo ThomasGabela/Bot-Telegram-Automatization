@@ -192,7 +192,7 @@ class ChatManager:
                         # Parseamos DD/MM
                         parsed = datetime.strptime(potential_date, "%d/%m")
                         # Usamos el año actual porque al bot no le importa el año (solo busca la carpeta del mes)
-                        target_date = parsed.replace(year=datetime.now().year)
+                        target_date = parsed.replace(year=config.NOW.year)
                         
                         # El nombre es todo menos la fecha
                         folder_name = " ".join(parts[:-1])
@@ -200,7 +200,7 @@ class ChatManager:
                         pass # No era fecha, es parte del nombre
                 
                 # Si no se especificó fecha, usamos HOY
-                final_date = target_date if target_date else datetime.now()
+                final_date = target_date if target_date else config.NOW
                 date_str = final_date.strftime("%d/%m")
                 
                 await message.reply_text(f"🚀 Ejecutando: `{folder_name}`\n📅 Fecha objetivo: `{date_str}`")

@@ -2,7 +2,6 @@ import time
 import json
 import re
 import os
-from datetime import datetime, timedelta
 from src.services.drive_service import drive_service
 from src.services.telegram_service import telegram_service
 
@@ -25,7 +24,7 @@ class Scheduler:
 
     def _load_state(self):
         """Carga estado previo."""
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = config.NOW.strftime("%Y-%m-%d")
         
         if os.path.exists(self.state_file):
             try:
@@ -48,7 +47,7 @@ class Scheduler:
             except: pass
 
     def _save_state(self):
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = config.NOW.strftime("%Y-%m-%d")
         
         with open(self.state_file, 'w') as f:
             json.dump({"date": today, "published": self.published_log}, f, indent=4)
@@ -139,9 +138,9 @@ class Scheduler:
         self._save_state()
 
     async def check_and_run(self):
-        now = datetime.now()
+        now = config.NOW
         today = now.strftime("%Y-%m-%d")
-        curr_time = (now - timedelta(hours=3)).strftime("%H:%M") # Ajuste UTC-3
+        curr_time = now.strftime("%H:%M")
 
         if self.current_date != today:
             self.current_date = today

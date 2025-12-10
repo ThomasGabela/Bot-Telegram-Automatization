@@ -76,7 +76,7 @@ class Processor:
                     break # Solo necesitamos un caption
             
             # --- BUSCAR MULTIMEDIA (En la fecha de hoy) ---
-            target = force_date if force_date else datetime.now()
+            target = force_date if force_date else config.NOW
             month_name = MESES[target.month]
             day_str = f"{target.day:02d}" # Ej: 06
             
