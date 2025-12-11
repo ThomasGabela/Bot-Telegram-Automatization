@@ -142,6 +142,7 @@ class Scheduler:
         today = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
         # 1. Auditoría Visual (Minuto 20 y 50)
+        log.info(f"⏰ Scheduler revisando tareas para {curr_time}...")
         if now.minute in [20, 50]:
             # Ejecutamos en segundo plano (sin await bloqueante estricto o confiando en la rapidez)
             # Para Python simple, lo llamamos directo. Drive API es rápida listando IDs.

@@ -11,7 +11,6 @@ from src.utils.logger import log
 from datetime import datetime, timedelta
 from src.config.settings import config
 
-
 # Mapeo de meses en español
 MESES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
@@ -290,7 +289,7 @@ class DriveService:
     def get_text_content(self, file_id):
             """Descarga texto plano o Google Docs exportado"""
             if not file_id or not self.service: return ""
-            count_errors = 0
+            
             try:
                 # 1. Obtener metadatos para ver el tipo de archivo
                 file_meta = self.service.files().get(fileId=file_id, fields='mimeType').execute()
@@ -318,34 +317,13 @@ class DriveService:
             #Si hay un error de servidor, reintentar
             except Exception as e:
                 from googleapiclient.errors import HttpError
-                from src.services.telegram_service import TelegramService
-                from src.core.scheduler import scheduler
-                
-                if isinstance(e, HttpError) or e.resp.status in [500, 502, 503, 504]:
+                if isinstance(e, HttpError) and e.resp.status in [500, 502, 503, 504]:
                     log.warning(f"Error de servidor {e.resp.status} al leer {file_id}, reintentando...")
-                    # await TelegramService.send_message_to_me(
-                    #     f"⚠️ Error de servidor {e.resp.status} al leer archivo {file_id}, reintentando...",
-                    #     destiny_chat_id= scheduler.alert_channel_id
-                    # )
-                    
-                    #Maximo 3 intentos
-                    count_errors += 1
-                    if count_errors >= 3: 
-                        log.error(f"Error leyendo archivo {file_id} después de 3 intentos: {e}")
-                        # await TelegramService.send_message_to_me(
-                        #     f"❌ Error leyendo archivo {file_id} después de 3 intentos: {e}",
-                        #     destiny_chat_id= scheduler.alert_channel_id
-                        # )
-                        return ""
                     return self.get_text_content(file_id)
                 else:
                     log.error(f"Error leyendo archivo {file_id}: {e}")
-                    # await TelegramService.send_message_to_me(
-                    #     f"❌ Error leyendo archivo {file_id}: {e}",
-                    #     destiny_chat_id= scheduler.alert_channel_id
-                    # )
                     return ""
-            
+
 
     def get_project_settings(self):
         if not config.DRIVE_ROOT_ID: return None, None
