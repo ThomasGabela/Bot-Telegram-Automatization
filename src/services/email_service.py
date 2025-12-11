@@ -1,7 +1,7 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.utils.logger import log
 from src.config.settings import config
 
@@ -21,7 +21,7 @@ class EmailService:
             log.warning("No hay destinatarios de correo configurados. Saltando reporte.")
             return
 
-        subject = f"📊 Reporte Bot Telegram - {config.NOW.strftime('%d/%m/%Y %H:%M')}"
+        subject = f"📊 Reporte Bot Telegram - {(datetime.now() - timedelta(hours=3)).strftime('%d/%m/%Y %H:%M')}"
         
         # Construir el cuerpo del mensaje (HTML simple para que se vea bonito)
         body_html = self._generate_html_body(execution_results)

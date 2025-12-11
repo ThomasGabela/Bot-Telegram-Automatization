@@ -19,7 +19,6 @@ class ChatManager:
         if not is_me and user_id not in scheduler.admin_ids:
             return
         
-
         # --- DETECTOR DE EMOJIS PREMIUM ---
         # Si el mensaje tiene entidades (formato), buscamos custom emojis
         if message.entities:
@@ -192,7 +191,7 @@ class ChatManager:
                         # Parseamos DD/MM
                         parsed = datetime.strptime(potential_date, "%d/%m")
                         # Usamos el año actual porque al bot no le importa el año (solo busca la carpeta del mes)
-                        target_date = parsed.replace(year=datetime.now() - timedelta(hours=3).year)
+                        target_date = parsed.replace(year=(datetime.now() - timedelta(hours=3)).year)
                         
                         # El nombre es todo menos la fecha
                         folder_name = " ".join(parts[:-1])

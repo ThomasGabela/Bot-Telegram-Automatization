@@ -8,7 +8,7 @@ from pyrogram.types import InputMediaPhoto, InputMediaVideo
 from src.core.scheduler import scheduler
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
-
+from datetime import datetime, timedelta
 class Processor:
     def __init__(self):
         self.emojis_map = {}
@@ -103,7 +103,7 @@ class Processor:
                     break # Solo necesitamos un caption
             
             # --- BUSCAR MULTIMEDIA (En la fecha de hoy) ---
-            target = force_date if force_date else config.NOW
+            target = force_date if force_date else (datetime.now() - timedelta(hours=3))
             month_name = MESES[target.month]
             day_str = f"{target.day:02d}" # Ej: 06
             
@@ -206,7 +206,7 @@ class Processor:
                         await telegram_service.client.send_media_group(target_chat_id, media=input_media_group)
                         await telegram_service.client.send_message(
                             scheduler.alert_channel_id,
-                            f"📅{config.NOW.strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot** \n{agency_folder_name}: Álbum de {len(input_media_group)} archivos enviado."
+                            f"📅{(datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot** \n{agency_folder_name}: Álbum de {len(input_media_group)} archivos enviado."
                             )
                         log.info("✅ Álbum enviado.")
                     else:

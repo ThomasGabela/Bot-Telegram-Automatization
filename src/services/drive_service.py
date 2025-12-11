@@ -261,7 +261,7 @@ class DriveService:
         except Exception as e: log.error(f"Error limpiando backlog: {e}")
 
         # 3. Identificar Mes Pasado
-        last_month_date = datetime.now() - timedelta(hours=3).replace(day=1) - timedelta(days=1)
+        last_month_date = (datetime.now() - timedelta(hours=3)).replace(day=1) - timedelta(days=1)
         last_month_name = MESES[last_month_date.month]
         
         # 4. Recorrer Agencias y Mover
@@ -451,7 +451,7 @@ class DriveService:
             log.info("📂 Carpeta 'Buzon' creada dentro de 'Settings'.")
             
         # 3. Crear archivo con Timestamp
-        timestamp = datetime.now() - timedelta(hours=3).strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = (datetime.now() - timedelta(hours=3)).strftime("%Y-%m-%d_%H-%M-%S")
         file_metadata = {
             'name': f'Mensaje_{timestamp} por_{identifier}',
             'parents': [buzon_id],

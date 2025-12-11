@@ -13,7 +13,7 @@ from src.core.chat_manager import chat_manager
 from src.core.scheduler import scheduler
 from src.utils.logger import log
 from pyrogram import idle
-from datetime import datetime
+from datetime import datetime, timedelta
 async def scheduler_loop():
     """
     Bucle infinito que revisa el reloj cada minuto.
@@ -48,7 +48,7 @@ async def main():
     #4. Notificación de Inicio
     try:
         target_chat = scheduler.alert_channel_id if scheduler.alert_channel_id else "me"
-        startup_msg = f"📅{config.NOW.strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot Iniciado Correctamente**"
+        startup_msg = f"📅{(datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot Iniciado Correctamente**"
         await telegram_service.send_message_to_me(startup_msg, destiny_chat_id=target_chat)
     except Exception as e:
         log.error(f"No se pudo enviar mensaje de inicio: {e}")

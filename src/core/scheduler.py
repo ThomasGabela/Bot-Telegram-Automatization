@@ -24,7 +24,7 @@ class Scheduler:
 
     def _load_state(self):
         """Carga estado previo."""
-        today = config.NOW.strftime("%Y-%m-%d")
+        today = (datetime.now() - timedelta(hours=3)).strftime("%Y-%m-%d")
         
         if os.path.exists(self.state_file):
             try:
@@ -47,7 +47,7 @@ class Scheduler:
             except: pass
 
     def _save_state(self):
-        today = config.NOW.strftime("%Y-%m-%d")
+        today = (datetime.now() - timedelta(hours=3)).strftime("%Y-%m-%d")
         
         with open(self.state_file, 'w') as f:
             json.dump({"date": today, "published": self.published_log}, f, indent=4)
