@@ -4,7 +4,7 @@ import re
 import os
 from src.services.drive_service import drive_service
 from src.services.telegram_service import telegram_service
-
+from datetime import datetime, timedelta
 from src.config.settings import config
 from src.utils.logger import log
 
@@ -138,7 +138,7 @@ class Scheduler:
         self._save_state()
 
     async def check_and_run(self):
-        now = config.NOW
+        now = datetime.now() - timedelta(hours=3)
         today = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
         # 1. Auditoría Visual (Minuto 20 y 50)

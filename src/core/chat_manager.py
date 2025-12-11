@@ -4,7 +4,7 @@ from src.utils.logger import log
 from pyrogram import enums
 from src.core.scheduler import scheduler # Importamos el scheduler
 from src.config.settings import config
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class ChatManager:
     async def handle_incoming_message(self, client, message):
@@ -192,7 +192,7 @@ class ChatManager:
                         # Parseamos DD/MM
                         parsed = datetime.strptime(potential_date, "%d/%m")
                         # Usamos el año actual porque al bot no le importa el año (solo busca la carpeta del mes)
-                        target_date = parsed.replace(year=config.NOW.year)
+                        target_date = parsed.replace(year=datetime.now() - timedelta(hours=3).year)
                         
                         # El nombre es todo menos la fecha
                         folder_name = " ".join(parts[:-1])
@@ -200,7 +200,7 @@ class ChatManager:
                         pass # No era fecha, es parte del nombre
                 
                 # Si no se especificó fecha, usamos HOY
-                final_date = target_date if target_date else config.NOW
+                final_date = target_date if target_date else datetime.now() - timedelta(hours=3)
                 date_str = final_date.strftime("%d/%m")
                 
                 await message.reply_text(f"🚀 Ejecutando: `{folder_name}`\n📅 Fecha objetivo: `{date_str}`")
