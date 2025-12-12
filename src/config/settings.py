@@ -2,12 +2,10 @@
 
 import os
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
 # Cargar variables del archivo .env
 load_dotenv()
 
 class Settings:
-    NOW = datetime.now() - timedelta(hours=3)  # Ajuste horario (ejemplo UTC-3)
     MULTIMEDIA_COUNT = 6  # Cantidad de archivos multimedia a enviar por mensaje
     # Telegram
     API_ID = os.getenv("TELEGRAM_API_ID")

@@ -9,15 +9,14 @@ from src.config.settings import config
 from src.utils.logger import log
 
 AUDIT_HOURS = [
-    "12", "12:30",
-    "13", "13:30",
-    "14", "14:30",
-    "15", "15:30",
-    "16", "16:30",
-    "17", "17:30",
-    "18", "18:30",
-    "19"
-    ]  # Horas para auditoría visual
+    "12:15", "12:45",
+    "13:15", "13:45",
+    "14:15", "14:45",
+    "15:15", "15:45",
+    "16:15", "16:45",
+    "17:15", "17:45",
+    "18:15", "18:45"
+]  # Horas para auditoría visual
 
 class Scheduler:
     def __init__(self):
@@ -58,13 +57,13 @@ class Scheduler:
                         log.info("🔄 Configuración cargada desde caché local.")
             except: pass
 
-    def _save_state(self, monthly=False):
+    def _save_state(self, update_config=False):
         today = (datetime.now() - timedelta(hours=3)).strftime("%Y-%m-%d")
         
         with open(self.state_file, 'w') as f:
             json.dump({"date": today, "published": self.published_log}, f, indent=4)
         
-        if monthly:
+        if update_config:
             with open(self.config_cache_file, 'w') as f:
                 json.dump({
                     "date": today, 
@@ -148,7 +147,7 @@ class Scheduler:
         self.admin_ids, self.target_channel_id, self.alert_channel_id = self._parse_custom_config(raw_chat_ids)
 
         log.info(f"✅ Config cargada: {len(self.schedule_map)} tareas | {len(self.admin_ids)} admins | Emisor: {self.target_channel_id}")
-        self._save_state()
+        self._save_state(update_config=True)
 
     async def check_and_run(self):
         now = datetime.now() - timedelta(hours=3)
@@ -159,53 +158,59 @@ class Scheduler:
         await telegram_service.send_message_to_me(f"⏰ Scheduler revisando tareas para {curr_time}...", destiny_chat_id=self.alert_channel_id)
         
         if curr_time in AUDIT_HOURS:
-            # Ejecutamos en segundo plano (sin await bloqueante estricto o confiando en la rapidez)
-            # Para Python simple, lo llamamos directo. Drive API es rápida listando IDs.
+            # Ejecutamos en segundo plano la auditoría visual
             try:
                 log.info("🔍 Iniciando auditoría visual de carpetas...")
                 await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:🔍 Iniciando auditoría visual de carpetas...", destiny_chat_id=self.alert_channel_id)
+                
                 informes = drive_service.run_visual_audit()
-                await telegram_service.send_message_to_me(f"✅ Auditoría visual completada. Informes generados:\n{informes}", destiny_chat_id=self.alert_channel_id)
+                if informes:
+                    # Enviar reporte solo si hubo cambios/errores relevantes (opcional: o siempre)
+                    # Cortar mensaje si es muy largo para Telegram (max 4096)
+                    if len(informes) > 4000: informes = informes[:4000] + "..."
+                    await telegram_service.send_message_to_me(f"✅ Auditoría visual completada. Informes generados:\n{informes}", destiny_chat_id=self.alert_channel_id)
             except Exception as e:
                 log.error(f"Error auditoría visual: {e}")
+                await telegram_service.send_message_to_me(f"❌ Error en auditoría visual: {e}", destiny_chat_id=self.alert_channel_id)
         
         # 2. Reinicio diario de publish_log
         if self.current_date != today:
             self.current_date = today
             self.published_log = []
+            # --- MANTENIMIENTO MENSUAL ---
+            if now.day == 1:
+                log.info("🗓️ Es día 1. Iniciando limpieza de Backlog...")
+                # Lo corremos en un thread aparte para no bloquear el bot si tarda mucho
+                # O simplemente lo llamamos directo si confiamos en la velocidad
+                try:
+                    await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:🗑️ Iniciando Mantenimiento Mensual de Drive...", destiny_chat_id=self.alert_channel_id)
+                    informes = drive_service.run_monthly_maintenance()
+                    await self.load_daily_config()
+                    await telegram_service.send_message_to_me(f"🗑️ Mantenimiento Mensual completado. Informes limpiados: \n{informes}", destiny_chat_id=self.alert_channel_id)
+                except Exception as e:
+                    log.error(f"Fallo en mantenimiento mensual: {e}")
+                    await telegram_service.send_message_to_me(f"❌ Error en Mantenimiento Mensual: {e}", destiny_chat_id=self.alert_channel_id)
+                # -----------------------------
+            
             await self._save_state()
-        # 3. Publicaciones programadas testing
-        
-        
+          
         # 3 Chequear Horarios para publicaciones
         for folder, time_trigger in self.schedule_map.items():
                    
             # Publicaciones testing 2 horas antes de la publicación real
-            if time_trigger == curr_time + timedelta(hours=2).strftime("%H:%M"):
+            # Testing (2 horas antes)
+            test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=2)).strftime("%H:%M")
+            if test_time == curr_time:
                 await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ **TESTING** Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
                 from src.core.procesador import processor
                 await processor.execute_agency_post(folder, target_chat_id=self.alert_channel_id)
-
+                pass
+            
+            # Publicación real
             if time_trigger <= curr_time:
                 if folder not in self.published_log:
                     await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
                     await self._trigger_publication(folder)
-
-        # --- MANTENIMIENTO MENSUAL ---
-            # Si es el día 1 del mes, ejecutamos limpieza
-        if now.day == 1:
-            log.info("🗓️ Es día 1. Iniciando limpieza de Backlog...")
-            # Lo corremos en un thread aparte para no bloquear el bot si tarda mucho
-            # O simplemente lo llamamos directo si confiamos en la velocidad
-            try:
-                await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:🗑️ Iniciando Mantenimiento Mensual de Drive...", destiny_chat_id=self.alert_channel_id)
-                informes = drive_service.run_monthly_maintenance()
-                await self._save_state(monthly=True)
-                await telegram_service.send_message_to_me(f"🗑️ Mantenimiento Mensual completado. Informes limpiados: \n{informes}", destiny_chat_id=self.alert_channel_id)
-            except Exception as e:
-                log.error(f"Fallo en mantenimiento mensual: {e}")
-                await telegram_service.send_message_to_me(f"❌ Error en Mantenimiento Mensual: {e}", destiny_chat_id=self.alert_channel_id)
-            # -----------------------------
 
     async def _trigger_publication(self, folder):
         from src.core.procesador import processor

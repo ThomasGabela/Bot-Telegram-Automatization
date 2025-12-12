@@ -1,6 +1,4 @@
-import io
-import os.path
-import calendar
+import io, os.path, calendar, time
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from google.auth.transport.requests import Request
@@ -119,6 +117,10 @@ class DriveService:
                 for day_folder in days_folders:
                     d_id = day_folder['id']
                     current_color = day_folder.get('folderColorRgb', '').lower()
+                    # --- PAUSA DE SEGURIDAD (ANTI-BAN) ---
+                    # 0.2 segundos es invisible para el usuario pero vital para la API
+                    time.sleep(0.2)
+                    
                     
                     # 5. CONTAR ARCHIVOS MULTIMEDIA (Bajo consumo: solo pedimos el total)
                     # No descargamos nada, solo contamos la lista
@@ -143,7 +145,8 @@ class DriveService:
                             ).execute()
 
                         #Formato de log: Agencia/Mes/Día
-                        logg = f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨**Actualizado** {agency_name}/{m_name}/{day_folder['name']} | **Color**: {target_color_name} | **Archivos**: {count}\n"
+                        status_txt = "Verde (OK)" if count == config.MULTIMEDIA_COUNT else f"Rojo (Faltan/Sobran: {count})"
+                        logg = f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨**Actualizado** {agency_name}/{m_name}/{day_folder['name']} --> {status_txt}\n"
                         log.info(logg)
                         informe += logg
                     except Exception as e:
