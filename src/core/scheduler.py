@@ -201,7 +201,9 @@ class Scheduler:
             # Testing (2 horas antes)
             test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=2)).strftime("%H:%M")
             if test_time == curr_time:
-                await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ **TESTING** Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
+                smg = f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ **TESTING** Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}\n"
+                smg += f"-------------------------------------------------------------------\n"
+                await telegram_service.send_message_to_me(smg, destiny_chat_id=self.alert_channel_id)
                 from src.core.procesador import processor
                 await processor.execute_agency_post(folder, target_chat_id=self.alert_channel_id)
                 pass
@@ -212,7 +214,7 @@ class Scheduler:
                     await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
                     await self._trigger_publication(folder)
 
-    async def _trigger_publication(self, folder):
+    async def _trigger_publication(self, folder, security_check=True):
         from src.core.procesador import processor
         
         if not self.target_channel_id:
@@ -221,7 +223,7 @@ class Scheduler:
 
         try:
             log.info(f"⏰ Publicando: {folder}")
-            await processor.execute_agency_post(folder, target_chat_id=self.target_channel_id)
+            await processor.execute_agency_post(folder, target_chat_id=self.target_channel_id, security_check=security_check)
             self.published_log.append(folder)
             self._save_state()
             log.info(f"✅ {folder} publicado.")
@@ -233,4 +235,6 @@ class Scheduler:
     async def force_reload(self):
         await self.load_daily_config()
 
+    async def force_publish(self, folder_name):
+        await self._trigger_publication(folder_name, security_check=False)
 scheduler = Scheduler()

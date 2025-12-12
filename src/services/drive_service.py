@@ -131,7 +131,6 @@ class DriveService:
 
                     # 6. PINTAR CARPETA SEGÚN RESULTADO
                     target_hex = COLOR_VERDE if count == config.MULTIMEDIA_COUNT else COLOR_ROJO
-                    target_color_name = "Verde" if count == config.MULTIMEDIA_COUNT else "Rojo"
                     # Si ya tiene el color correcto, saltar
                     if current_color == target_hex.lower():
                         continue

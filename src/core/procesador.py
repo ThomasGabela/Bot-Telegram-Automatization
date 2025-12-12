@@ -73,21 +73,21 @@ class Processor:
             log.warning(f"⚠️ No se pudieron leer metadatos de video: {e}")
             return 0, 0, 0
 
-    async def execute_agency_post(self, agency_folder_name, target_chat_id="me", force_date=None):
+    async def execute_agency_post(self, agency_folder_name, target_chat_id="me", force_date=None, security_check=True):
             log.info(f"🚀 Procesando agencia: {agency_folder_name}")
 
             # 1. Buscar carpeta
             agency_id = drive_service.find_item_id_by_name(config.DRIVE_ROOT_ID, agency_folder_name, is_folder=True, exact_match=True)
             if not agency_id: 
                 msg = f"Carpeta '{agency_folder_name}' no encontrada."
-                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
 
             # 2. Listar contenido
             files = drive_service.list_files_in_folder(agency_id)
             if not files: 
                 msg = f"La carpeta '{agency_folder_name}' está vacía."
-                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
             files.sort(key=lambda x: x['name'])
             
@@ -113,16 +113,24 @@ class Processor:
             month_id = drive_service.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
             if not month_id: 
                 msg = f"No existe la carpeta del mes `{month_name}`."
-                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
             
             # Buscar carpeta del Día
             day_id = drive_service.find_item_id_by_name(month_id, day_str, is_folder=True, exact_match=True)
             if not day_id: 
                 msg = f"No existe la carpeta del día `{day_str}`."
-                await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
-            
+            if security_check:
+                # Solo publicar si el color es VERDE
+                current_color = drive_service.get_folder_color_hex(day_id)
+                if current_color != drive_service.COLOR_VERDE:
+                    count_files = drive_service.count_media_files_in_folder(day_id)
+                    msg = f"La carpeta del día `{day_str}` no está marcada como lista (color verde) | {count_files} archivos.\n De ser un error usar el comando /force_publish [folder]."
+                    # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                    raise Exception(msg)
+                
             # Listar contenido del DÍA
             day_files = drive_service.list_files_in_folder(day_id)
             day_files.sort(key=lambda x: x['name']) # Ordenar 1, 2, 3

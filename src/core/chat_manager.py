@@ -240,6 +240,26 @@ class ChatManager:
                 else:
                     await message.reply_text("❌ Hubo un error creando las carpetas.")
                 return
+    
+        # 8. Forzar Publicación (Admin)
+            if cmd_lower.startswith("force_publish ") or cmd_lower.startswith("forzar_publicar "):
+                if cmd_lower.startswith("force_publish "): folder_to_publish = text[15:].strip() # Quitar "force_publish "
+                else: folder_to_publish = text[17:].strip() # Quitar "forzar_publicar "
+                
+                if not folder_to_publish:
+                    await message.reply_text("⚠️ Indica el nombre de la carpeta a publicar.\nEj: `force_publish Poker`")
+                    return
+                
+                await message.reply_text(f"🚀 Forzando publicación de `{folder_to_publish}`...")
+                
+                try:
+                    await scheduler.force_publish(folder_to_publish)
+                    await message.reply_text("✅ Publicación forzada finalizada.")
+                    return
+                except Exception as e:
+                    await message.reply_text(f"❌ Error: {e}")
+                    return
+    
     # --- BLOQUE DE GUARDADO (CAPTION O BUZÓN) ---
         
         # 1. Intentamos buscar la carpeta exacta en Drive
