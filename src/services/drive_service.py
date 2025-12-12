@@ -1,13 +1,15 @@
 import io, os.path, calendar, time
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from src.config.settings import config
 from src.utils.logger import log
 from datetime import datetime, timedelta
 from src.config.settings import config
+
+# ✅ CORRECTO para Service Accounts
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 # Mapeo de meses en español
 MESES = {
@@ -28,46 +30,24 @@ class DriveService:
 
     def connect(self):
         """Conecta usando OAuth2 (Usuario real) y guarda el token.json"""
+        # Define tus scopes
+
+        # Ruta a tu archivo JSON que ya descargaste
+        SERVICE_ACCOUNT_FILE = 'credentials.json'
         creds = None
-        # El token.json almacena el acceso del usuario y los tokens de actualización
-        token_path = 'token.json'
-
+        
         try:
-            # 1. ¿Existe el token.json? (Ya nos logueamos antes)
-            if os.path.exists(token_path):
-                creds = Credentials.from_authorized_user_file(token_path, self.scopes)
-            
-            # 2. Si no hay credenciales válidas, loguearse
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    try:
-                        creds.refresh(Request())
-                    except Exception:
-                        # Si falla el refresh, borramos y pedimos login de nuevo
-                        if os.path.exists(token_path):
-                            os.remove(token_path)
-                        creds = None
+                # Esta es la línea mágica para cuentas de servicio
+                creds = service_account.Credentials.from_service_account_file(
+                        SERVICE_ACCOUNT_FILE, scopes=self.scopes)
                 
-                if not creds:
-                    # Abrir navegador para login inicial
-                    if not os.path.exists(config.CREDENTIALS_FILE):
-                        raise FileNotFoundError(f"Falta el archivo {config.CREDENTIALS_FILE} (OAuth Client ID) en la raíz.")
-                        
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        config.CREDENTIALS_FILE, self.scopes)
-                    
-                    # Ejecuta servidor local y espera el callback de Google
-                    creds = flow.run_local_server(port=0)
+                # Construir el servicio
+                service = build('drive', 'v3', credentials=creds)
                 
-                # Guardar las credenciales para la próxima ejecución
-                with open(token_path, 'w') as token:
-                    token.write(creds.to_json())
+                self.service = service
 
-            self.service = build('drive', 'v3', credentials=creds)
-            log.info("✅ Conexión con Google Drive establecida (Modo Usuario).")
-            
         except Exception as e:
-            log.error(f"Error fatal conectando a Drive: {e}")
+            raise(f"Error autenticando: {e}")
 
     def find_item_id_by_name(self, parent_id, item_name, is_folder=False, exact_match=False):
         if not self.service: return None

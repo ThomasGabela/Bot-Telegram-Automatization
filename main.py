@@ -14,6 +14,33 @@ from src.core.scheduler import scheduler
 from src.utils.logger import log
 from pyrogram import idle
 from datetime import datetime, timedelta
+
+
+# ✅ CORRECTO para Service Accounts
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+
+# Define tus scopes
+SCOPES = ['https://www.googleapis.com/auth/drive']
+
+# Ruta a tu archivo JSON que ya descargaste
+SERVICE_ACCOUNT_FILE = 'ruta/a/tu_json_descargado.json'
+
+def autenticar_drive():
+    creds = None
+    try:
+        # Esta es la línea mágica para cuentas de servicio
+        creds = service_account.Credentials.from_service_account_file(
+                SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        
+        # Construir el servicio
+        service = build('drive', 'v3', credentials=creds)
+        return service
+        
+    except Exception as e:
+        print(f"Error autenticando: {e}")
+        return None
+
 async def scheduler_loop():
     """
     Bucle infinito que revisa el reloj cada minuto.

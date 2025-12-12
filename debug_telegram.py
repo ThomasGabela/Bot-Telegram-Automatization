@@ -3,12 +3,36 @@ import platform
 import logging
 from pyrogram import Client, filters, idle
 from src.config.settings import config
+import json
 
 # Configurar log básico directo a consola
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("DEBUG")
 
+
+# ✅ CORRECTO para Service Accounts
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+
+# Define tus scopes
+SCOPES = ['https://www.googleapis.com/auth/drive']
+
+# Ruta a tu archivo JSON que ya descargaste
+SERVICE_ACCOUNT_FILE = 'credentials.json'
+
+
 async def main():
+    # Uso en tu main
+    drive_service = autenticar_drive()
+
+    # Prueba rápida para ver si conecta (listar archivos)
+    if drive_service:
+        results = drive_service.files().list(pageSize=10).execute()
+        items = results.get('files', [])
+    with open("items.json", 'w') as f:
+        json.dump(items, f, indent=4)
+    print("Conexión exitosa. Archivos encontrados:", items)
+    
     print("--- INICIANDO DIAGNÓSTICO DE TELEGRAM ---")
     
     # 1. Definir Cliente (Usamos la misma sesión)
@@ -43,6 +67,32 @@ async def main():
 
     await idle()
     await app.stop()
+
+
+def autenticar_drive():
+    creds = None
+    try:
+        # Esta es la línea mágica para cuentas de servicio
+        creds = service_account.Credentials.from_service_account_file(
+                SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        
+        # Construir el servicio
+        service = build('drive', 'v3', credentials=creds)
+        return service
+        
+    except Exception as e:
+        print(f"Error autenticando: {e}")
+        return None
+
+# Uso en tu main
+drive_service = autenticar_drive()
+
+# Prueba rápida para ver si conecta (listar archivos)
+if drive_service:
+    results = drive_service.files().list(pageSize=10).execute()
+    items = results.get('files', [])
+    print("Conexión exitosa. Archivos encontrados:", items)
+
 
 if __name__ == "__main__":
     # Parche Windows
