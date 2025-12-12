@@ -8,6 +8,17 @@ from datetime import datetime, timedelta
 from src.config.settings import config
 from src.utils.logger import log
 
+AUDIT_HOURS = [
+    "12", "12:30",
+    "13", "13:30",
+    "14", "14:30",
+    "15", "15:30",
+    "16", "16:30",
+    "17", "17:30",
+    "18", "18:30",
+    "19"
+    ]  # Horas para auditoría visual
+
 class Scheduler:
     def __init__(self):
         self.current_date = None
@@ -16,6 +27,7 @@ class Scheduler:
         self.admin_ids = []        # Lista de IDs permitidos
         self.target_channel_id = None # ID del canal emisor principal
         self.published_log = []
+        self.alert_channel_id = None # Canal para alertas
         
         self.state_file = os.path.join(config.DATA_DIR, "published_state.json")
         self.config_cache_file = os.path.join(config.DATA_DIR, "config_cache.json")
@@ -46,20 +58,21 @@ class Scheduler:
                         log.info("🔄 Configuración cargada desde caché local.")
             except: pass
 
-    def _save_state(self):
+    def _save_state(self, monthly=False):
         today = (datetime.now() - timedelta(hours=3)).strftime("%Y-%m-%d")
         
         with open(self.state_file, 'w') as f:
             json.dump({"date": today, "published": self.published_log}, f, indent=4)
-            
-        with open(self.config_cache_file, 'w') as f:
-            json.dump({
-                "date": today, 
-                "schedule": self.schedule_map,
-                "admins": self.admin_ids,
-                "emisor": self.target_channel_id,
-                "alert": self.alert_channel_id
-            }, f, indent=4)
+        
+        if monthly:
+            with open(self.config_cache_file, 'w') as f:
+                json.dump({
+                    "date": today, 
+                    "schedule": self.schedule_map,
+                    "admins": self.admin_ids,
+                    "emisor": self.target_channel_id,
+                    "alert": self.alert_channel_id
+                }, f, indent=4)
 
     def _parse_custom_config(self, text):
         """
@@ -143,24 +156,39 @@ class Scheduler:
         curr_time = now.strftime("%H:%M")
         # 1. Auditoría Visual (Minuto 20 y 50)
         log.info(f"⏰ Scheduler revisando tareas para {curr_time}...")
-        if now.minute in [20, 50]:
+        await telegram_service.send_message_to_me(f"⏰ Scheduler revisando tareas para {curr_time}...", destiny_chat_id=self.alert_channel_id)
+        
+        if curr_time in AUDIT_HOURS:
             # Ejecutamos en segundo plano (sin await bloqueante estricto o confiando en la rapidez)
             # Para Python simple, lo llamamos directo. Drive API es rápida listando IDs.
             try:
                 log.info("🔍 Iniciando auditoría visual de carpetas...")
-                drive_service.run_visual_audit()
+                await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:🔍 Iniciando auditoría visual de carpetas...", destiny_chat_id=self.alert_channel_id)
+                informes = drive_service.run_visual_audit()
+                await telegram_service.send_message_to_me(f"✅ Auditoría visual completada. Informes generados:\n{informes}", destiny_chat_id=self.alert_channel_id)
             except Exception as e:
                 log.error(f"Error auditoría visual: {e}")
-                
+        
+        # 2. Reinicio diario de publish_log
         if self.current_date != today:
             self.current_date = today
             self.published_log = []
-            await self.load_daily_config()
-
-        # Chequear Horarios
+            await self._save_state()
+        # 3. Publicaciones programadas testing
+        
+        
+        # 3 Chequear Horarios para publicaciones
         for folder, time_trigger in self.schedule_map.items():
-            if time_trigger == curr_time:
+                   
+            # Publicaciones testing 2 horas antes de la publicación real
+            if time_trigger == curr_time + timedelta(hours=2).strftime("%H:%M"):
+                await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ **TESTING** Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
+                from src.core.procesador import processor
+                await processor.execute_agency_post(folder, target_chat_id=self.alert_channel_id)
+
+            if time_trigger <= curr_time:
                 if folder not in self.published_log:
+                    await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
                     await self._trigger_publication(folder)
 
         # --- MANTENIMIENTO MENSUAL ---
@@ -170,9 +198,13 @@ class Scheduler:
             # Lo corremos en un thread aparte para no bloquear el bot si tarda mucho
             # O simplemente lo llamamos directo si confiamos en la velocidad
             try:
-                drive_service.run_monthly_maintenance()
+                await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:🗑️ Iniciando Mantenimiento Mensual de Drive...", destiny_chat_id=self.alert_channel_id)
+                informes = drive_service.run_monthly_maintenance()
+                await self._save_state(monthly=True)
+                await telegram_service.send_message_to_me(f"🗑️ Mantenimiento Mensual completado. Informes limpiados: \n{informes}", destiny_chat_id=self.alert_channel_id)
             except Exception as e:
                 log.error(f"Fallo en mantenimiento mensual: {e}")
+                await telegram_service.send_message_to_me(f"❌ Error en Mantenimiento Mensual: {e}", destiny_chat_id=self.alert_channel_id)
             # -----------------------------
 
     async def _trigger_publication(self, folder):
@@ -190,6 +222,7 @@ class Scheduler:
             log.info(f"✅ {folder} publicado.")
         except Exception as e:
             log.error(f"⚠️ Fallo automático en {folder}: {e}")
+            await telegram_service.send_message_to_me(f"❌ Error publicando {folder}: {e}", destiny_chat_id=self.alert_channel_id)
             # Aquí podrías iterar sobre self.admin_ids para enviar alerta a todos
             
     async def force_reload(self):

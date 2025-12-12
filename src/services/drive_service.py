@@ -85,19 +85,18 @@ class DriveService:
             log.error(f"Error buscando '{item_name}': {e}")
             return None
 
-# --- MOTOR DE AUDITORÍA OPTIMIZADO (BATCH) ---
     def run_visual_audit(self):
-        """
-        Versión Ultra-Rápida usando Batch Requests.
-        Reduce cientos de llamadas HTTP a solo unas pocas por agencia.
-        """
-        log.info("🎨 Iniciando Auditoría Inteligente (Batch Mode)...")
+        """Revisa conteo de archivos y pinta carpetas (Semáforo)"""
+        log.info("🎨 Iniciando Auditoría Visual de Drive...")
+        now = datetime.now() - timedelta(hours=3)
         
+        informe = ""
+        informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨 Iniciando Auditoría Visual (Single Mode)...\n"
+        # 1. Obtener Agencias
         agencies = self.get_available_folders()
         root = config.DRIVE_ROOT_ID
         
-        # Meses a auditar (Actual y Siguiente)
-        now = datetime.now() - timedelta(hours=3)
+        # 2. Calcular Meses relevantes (Actual y Siguiente)
         months_to_check = [MESES[now.month], MESES[(now.replace(day=1) + timedelta(days=32)).month]]
 
         for agency_name in agencies:
@@ -106,92 +105,55 @@ class DriveService:
             agency_id = self.find_item_id_by_name(root, agency_name, is_folder=True, exact_match=True)
             if not agency_id: continue
 
+            # 3. Revisar los meses
             for m_name in months_to_check:
                 m_id = self.find_item_id_by_name(agency_id, m_name, is_folder=True, exact_match=True)
                 if not m_id: continue
 
-                # 1. Obtener Días y su Color Actual (1 Llamada)
-                # Traemos 'folderColorRgb' para comparar y no actualizar si no hace falta
+                # 4. Listar Días (Carpetas hijas)
+                # Optimizacion: Pedimos solo ID y Nombre de las carpetas de días
                 q_days = f"'{m_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-                days_res = self.service.files().list(q=q_days, fields="files(id, name, folderColorRgb)").execute()
+                days_res = self.service.files().list(q=q_days, fields="files(id, name)").execute()
                 days_folders = days_res.get('files', [])
-
-                if not days_folders: continue
-
-                # Diccionario para guardar resultados del batch
-                # Estructura: { day_id: file_count }
-                counts_map = {} 
-
-                # Callback para procesar cada respuesta del lote
-                def callback_count(request_id, response, exception):
-                    if exception:
-                        log.error(f"Error contando en lote: {exception}")
-                    else:
-                        # request_id lo usaremos para mapear al folder ID real
-                        # response['files'] es la lista de archivos
-                        count = len(response.get('files', []))
-                        counts_map[request_id] = count
-
-                # 2. Preparar LOTE de Conteos (Batch Request)
-                batch_count = self.service.new_batch_http_request(callback=callback_count)
-                
-                valid_day_ids = [] # Guardamos IDs para iterar luego
-
-                for day in days_folders:
-                    d_id = day['id']
-                    valid_day_ids.append(d_id)
+               
+                for day_folder in days_folders:
+                    d_id = day_folder['id']
+                    current_color = day_folder.get('folderColorRgb', '').lower()
                     
-                    # Query ligera: Solo IDs, max 20 resultados (suficiente para saber si es 6 o no)
-                    # Usamos el ID de la carpeta como 'request_id' para el callback
+                    # 5. CONTAR ARCHIVOS MULTIMEDIA (Bajo consumo: solo pedimos el total)
+                    # No descargamos nada, solo contamos la lista
                     q_files = f"'{d_id}' in parents and (mimeType contains 'image/' or mimeType contains 'video/') and trashed = false"
-                    req = self.service.files().list(q=q_files, pageSize=20, fields="files(id)")
-                    batch_count.add(req, request_id=d_id)
+                    # pageSize=1000 y fields='files(id)' hace que la respuesta pese bytes.
+                    files_res = self.service.files().list(q=q_files, pageSize=20, fields="files(id)").execute()
+                    count = len(files_res.get('files', []))
 
-                # Ejecutar 30 consultas en 1 sola transmisión HTTP
-                try:
-                    batch_count.execute()
-                except Exception as e:
-                    log.error(f"Fallo al ejecutar batch de conteo: {e}")
-                    continue
-
-                # 3. Analizar y Preparar LOTE de Actualizaciones (Solo cambios necesarios)
-                batch_update = self.service.new_batch_http_request()
-                updates_queued = 0
-                days_updated = []
-                
-                for day in days_folders:
-                    d_id = day['id']
-                    current_color = day.get('folderColorRgb', '').lower() # Drive devuelve Hex a veces
-                    count = counts_map.get(d_id, 0)
-
-                    # Lógica de Negocio: 6 archivos = Verde, Otro = Rojo
-                    target_color = COLOR_VERDE if count == config.MULTIMEDIA_COUNT else COLOR_ROJO
-                    
-                    # log.info(f" - {agency_name}/{m_name}/{day['name']}: {count} archivos -> Target_Color {target_color} | Actual_Color {current_color}")
-                    # Normalización simple para comparar (Drive a veces no devuelve color si es default)
-                    # Si el color ya es el correcto, saltamos (Ahorro de API)
-                    if current_color == target_color.lower():
+                    # 6. PINTAR CARPETA SEGÚN RESULTADO
+                    target_hex = COLOR_VERDE if count == config.MULTIMEDIA_COUNT else COLOR_ROJO
+                    target_color_name = "Verde" if count == config.MULTIMEDIA_COUNT else "Rojo"
+                    # Si ya tiene el color correcto, saltar
+                    if current_color == target_hex.lower():
                         continue
-
-                    # Si es diferente, encolamos actualización
-                    # Usamos folderColorRgb con el Hex exacto
-                    body = {'folderColorRgb': target_color}
-                    req = self.service.files().update(fileId=d_id, body=body, fields='id')
-                    batch_update.add(req)
-                    updates_queued += 1
-                    days_updated.append(day['name'])
-
-                # 4. Ejecutar actualizaciones (si las hay)
-                if updates_queued > 0:
                     try:
-                        batch_update.execute()
-                        log.info(f"🎨 Actualizadas {updates_queued} carpetas en {agency_name}/{m_name}/{days_updated}")
+                        self.service.files().update(
+                            fileId=d_id, 
+                            body={
+                                'folderColorRgb': target_hex
+                            }, 
+                            fields='id'
+                            ).execute()
+
+                        #Formato de log: Agencia/Mes/Día
+                        logg = f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨**Actualizado** {agency_name}/{m_name}/{day_folder['name']} | **Color**: {target_color_name} | **Archivos**: {count}\n"
+                        log.info(logg)
+                        informe += logg
                     except Exception as e:
-                        log.error(f"Error batch update: {e}")
-                else:
-                    log.info(f"🎨 No se requieren actualizaciones de Auditoria en {agency_name}/{m_name}")
-                
-        log.info("✅ Auditoría Visual Finalizada.")
+                        log.error(f"Error pintando {agency_name}/{m_name}/{day_folder['name']}: {e}")
+                        informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: ❌ **Error pintando** {agency_name}/{m_name}/{day_folder['name']}: {e}\n"
+                        
+        
+        log.info("🎨 Auditoría finalizada.")
+        informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨 Auditoría Visual finalizada.\n"
+        return informe
 
     def create_folder(self, folder_name, parent_id):
         """Crea una carpeta y retorna su ID"""
@@ -231,6 +193,10 @@ class DriveService:
             month_id = self.find_item_id_by_name(agency_id, month_name, is_folder=True, exact_match=True)
             if not month_id:
                 month_id = self.create_folder(month_name, agency_id)
+            else:
+                log.info(f"Carpeta de mes '{month_name}' ya existe. Omitiendo creación de días...")
+                continue
+            log.info(f"📂 Creando mes: {month_name} en {agency_name}")
             
             # Crear Días
             _, days_in_month = calendar.monthrange(date_obj.year, date_obj.month)
@@ -244,9 +210,10 @@ class DriveService:
     def run_monthly_maintenance(self):
         """Mueve el mes pasado a Backlog"""
         log.info("🧹 Ejecutando mantenimiento mensual...")
-        
+        informe = ""
+        now = datetime.now() - timedelta(hours=3)
         # 1. Preparar Backlog
-        settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Settings", is_folder=True)
+        settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "末Settings", is_folder=True)
         backlog_id = self.find_item_id_by_name(settings_id, "Backlog", is_folder=True)
         
         if not backlog_id:
@@ -258,17 +225,19 @@ class DriveService:
             for child in children.get('files', []):
                 self.service.files().update(fileId=child['id'], body={'trashed': True}).execute()
             log.info("🗑️ Backlog limpiado.")
+            informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🗑️ Se ha eliminado el contenido anterior del Backlog.\n"
         except Exception as e: log.error(f"Error limpiando backlog: {e}")
 
         # 3. Identificar Mes Pasado
-        last_month_date = (datetime.now() - timedelta(hours=3)).replace(day=1) - timedelta(days=1)
+        last_month_date = now.replace(day=1) - timedelta(days=1)
         last_month_name = MESES[last_month_date.month]
-        
+        next_month_date = now.replace(day=1) + timedelta(days=32)
+        next_month_name = MESES[next_month_date.month]
         # 4. Recorrer Agencias y Mover
         agencies = self.get_available_folders() # Lista de nombres
         
         for agency in agencies:
-            if agency in ["Settings", "Buzon"]: continue
+            if agency == "末Settings": continue
             
             agency_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, agency, is_folder=True, exact_match=True)
             month_folder_id = self.find_item_id_by_name(agency_id, last_month_name, is_folder=True, exact_match=True)
@@ -285,7 +254,16 @@ class DriveService:
                     removeParents=agency_id
                 ).execute()
                 log.info(f"📦 Movido {agency}/{last_month_name} a Backlog.")
-                
+                informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 📦 Movido {agency}/{last_month_name} a Backlog.\n"
+
+            # Crear estructura del mes siguiente
+            log.info(f"📅 Creando estructura para el mes {next_month_name} en {agency}...")
+            informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 📅 Creando estructura para el mes {next_month_name} en {agency}...\n"
+            self.create_agency_structure(agency)
+        log.info("🧹 Mantenimiento mensual finalizado.")
+        informe += f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}: 🧹 Mantenimiento mensual finalizado.\n"
+        return informe
+    
     def get_text_content(self, file_id):
             """Descarga texto plano o Google Docs exportado"""
             if not file_id or not self.service: return ""
@@ -323,7 +301,6 @@ class DriveService:
                 else:
                     log.error(f"Error leyendo archivo {file_id}: {e}")
                     return ""
-
 
     def get_project_settings(self):
         if not config.DRIVE_ROOT_ID: return None, None
