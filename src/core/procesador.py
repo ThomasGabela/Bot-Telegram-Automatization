@@ -1,6 +1,5 @@
-import os
-import re
-from src.services.drive_service import drive_service, MESES
+import os, time
+from src.services.drive_service import drive_service, MESES, COLOR_VERDE, COLOR_ROJO
 from src.services.telegram_service import telegram_service
 from src.config.settings import config
 from src.utils.logger import log
@@ -122,13 +121,19 @@ class Processor:
                 msg = f"No existe la carpeta del día `{day_str}`."
                 # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                 raise Exception(msg)
+            
+            # Seguridad: Verificar color de la carpeta
             if security_check:
                 # Solo publicar si el color es VERDE
                 current_color = drive_service.get_folder_color_hex(day_id)
-                if current_color != drive_service.COLOR_VERDE:
-                    count_files = drive_service.count_media_files_in_folder(day_id)
-                    msg = f"La carpeta del día `{day_str}` no está marcada como lista (color verde) | {count_files} archivos.\n De ser un error usar el comando /force_publish [folder]."
-                    # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
+                time.sleep(0.1)  # Pequeña espera para evitar rate limits
+                count_files = drive_service.count_media_files_in_folder(day_id)
+                time.sleep(0.1)  # Pequeña espera para evitar rate limits
+                
+                # Si no es verde o no tiene la cantidad correcta de archivos, no publicar
+                if current_color != COLOR_VERDE and int(count_files) != int(config.MULTIMEDIA_COUNT):
+                    msg = f"🤖 **Bot**{(datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')}: La carpeta {agency_folder_name} {month_name}/{day_str} no dispone de todos los archivos. Archivos encontrados {count_files}.\nDe ser un error usar el comando /force_publish [folder] Para forzar su publicacion al dia de hoy y saltear esta seguridad"
+                # await telegram_service.send_message_to_me(msg, destiny_chat_id=scheduler.alert_channel_id)
                     raise Exception(msg)
                 
             # Listar contenido del DÍA

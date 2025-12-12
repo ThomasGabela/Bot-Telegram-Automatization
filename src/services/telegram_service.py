@@ -53,10 +53,16 @@ class TelegramService:
             log.error("❌ ERROR: Intentaste agregar un handler antes de iniciar el bot.")
             return
 
-        # Filtro de texto simple (igual que en debug_telegram.py)
+        # Combinamos filtros:
+        # 1. filters.text: Que sea texto
+        # 2. whitelist_filter: Que venga de los chats permitidos
+        
+        whitelist_filter = filters.chat(config.ALLOWED_CHATS)
+        security_filter = filters.text & whitelist_filter
+        
         new_handler = MessageHandler(
             handler_function,
-            filters.text
+            security_filter
         )
 
         self.client.add_handler(new_handler)

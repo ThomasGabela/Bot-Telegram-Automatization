@@ -10,6 +10,9 @@ class Settings:
     # Telegram
     API_ID = os.getenv("TELEGRAM_API_ID")
     API_HASH = os.getenv("TELEGRAM_API_HASH")
+    ME_ID = int(os.getenv("TELEGRAM_ME_ID", 0))
+    GRUPO_ADMIN_ID = int(os.getenv("TELEGRAM_GRUPO_ADMIN_ID", 0))
+    ALLOWED_CHATS = [ME_ID, GRUPO_ADMIN_ID]
     
     # Drive
     DRIVE_ROOT_ID = os.getenv("DRIVE_ROOT_FOLDER_ID")

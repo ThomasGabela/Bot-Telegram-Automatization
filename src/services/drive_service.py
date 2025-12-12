@@ -96,22 +96,21 @@ class DriveService:
                
                 for day_folder in days_folders:
                     d_id = day_folder['id']
-                    current_color = day_folder.get('folderColorRgb', '').lower()
+                    log.info(day_folder)
+                    current_color = self.get_folder_color_hex(d_id)
                     # --- PAUSA DE SEGURIDAD (ANTI-BAN) ---
                     # 0.2 segundos es invisible para el usuario pero vital para la API
                     time.sleep(0.2)
                     
                     
                     # 5. CONTAR ARCHIVOS MULTIMEDIA (Bajo consumo: solo pedimos el total)
-                    # No descargamos nada, solo contamos la lista
-                    q_files = f"'{d_id}' in parents and (mimeType contains 'image/' or mimeType contains 'video/') and trashed = false"
-                    # pageSize=1000 y fields='files(id)' hace que la respuesta pese bytes.
-                    files_res = self.service.files().list(q=q_files, pageSize=20, fields="files(id)").execute()
-                    count = len(files_res.get('files', []))
+
+                    count = self.count_media_files_in_folder(d_id)
 
                     # 6. PINTAR CARPETA SEGÚN RESULTADO
-                    target_hex = COLOR_VERDE if count == config.MULTIMEDIA_COUNT else COLOR_ROJO
+                    target_hex = COLOR_VERDE if int(count) == int(config.MULTIMEDIA_COUNT) else COLOR_ROJO
                     # Si ya tiene el color correcto, saltar
+                    log.info(f"Carpeta {agency_name}/{m_name}/{day_folder['name']} tiene {count} archivos. Color actual: {current_color}, Color objetivo: {target_hex}")
                     if current_color == target_hex.lower():
                         continue
                     try:
@@ -124,18 +123,57 @@ class DriveService:
                             ).execute()
 
                         #Formato de log: Agencia/Mes/Día
-                        status_txt = "Verde (OK)" if count == config.MULTIMEDIA_COUNT else f"Rojo (Faltan/Sobran: {count})"
-                        logg = f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨**Actualizado** {agency_name}/{m_name}/{day_folder['name']} --> {status_txt}\n"
+                        status_txt = "Verde (OK)" if count == config.MULTIMEDIA_COUNT else f"Rojo (Archivos Totales: {count})"
+                        logg = f"🤖{(datetime.now() - timedelta(hours=3)).strftime('%H:%M:%S')}: 🎨**Actualizado** {agency_name}/{m_name}/{day_folder['name']} --> {status_txt}\n"
                         log.info(logg)
                         informe += logg
                     except Exception as e:
                         log.error(f"Error pintando {agency_name}/{m_name}/{day_folder['name']}: {e}")
-                        informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: ❌ **Error pintando** {agency_name}/{m_name}/{day_folder['name']}: {e}\n"
-                        
+                        informe += f"🤖{(datetime.now() - timedelta(hours=3)).strftime('%H:%M:%S')}: ❌ **Error pintando** {agency_name}/{m_name}/{day_folder['name']}: {e}\n"
+                        continue
         
         log.info("🎨 Auditoría finalizada.")
-        informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨 Auditoría Visual finalizada.\n"
+        informe += f"🤖{(datetime.now() - timedelta(hours=3)).strftime('%H:%M:%S')}: 🎨 Auditoría Visual finalizada.\n"
         return informe
+
+    def get_folder_color_hex(self, folder_id):
+            """
+            Obtiene el color hexadecimal de una carpeta. 
+            Retorna None si no tiene color asignado (gris por defecto).
+            """
+            try:
+                # Solicitamos el campo 'folderColorRgb' a la API
+                file = self.service.files().get(
+                    fileId=folder_id, 
+                    fields='folderColorRgb'
+                ).execute()
+                
+                color = file.get('folderColorRgb')
+                log.info(f"Color detectado para carpeta {folder_id}: {color}") # Descomentar para debug
+                return color
+            except Exception as e:
+                print(f"Error obteniendo color: {e}")
+                return None
+
+    def count_media_files_in_folder(self, folder_id):
+            """
+            Cuenta cuántos archivos (que no sean carpetas) hay dentro del ID dado.
+            """
+            try:
+                # Query: Busca archivos dentro de la carpeta que NO sean carpetas y NO estén en la papelera
+                query = f"'{folder_id}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+                
+                # Solo traemos los IDs para que sea una consulta rápida y ligera
+                results = self.service.files().list(
+                    q=query, 
+                    fields="files(id)"
+                ).execute()
+                
+                files = results.get('files', [])
+                return len(files)
+            except Exception as e:
+                print(f"Error contando archivos: {e}")
+                return 0
 
     def create_folder(self, folder_name, parent_id):
         """Crea una carpeta y retorna su ID"""

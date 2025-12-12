@@ -9,13 +9,13 @@ from src.config.settings import config
 from src.utils.logger import log
 
 AUDIT_HOURS = [
-    "12:15", "12:45",
-    "13:15", "13:45",
-    "14:15", "14:45",
-    "15:15", "15:45",
-    "16:15", "16:45",
-    "17:15", "17:45",
-    "18:15", "18:45"
+    "12:15", # "12:45",
+    "13:15", # "13:45",
+    "14:15", # "14:45",
+    "15:15", # "15:45",
+    "16:15", # "16:45",
+    "17:15", # "17:45",
+    "18:15" # "18:45"
 ]  # Horas para auditoría visual
 
 class Scheduler:
@@ -27,6 +27,7 @@ class Scheduler:
         self.target_channel_id = None # ID del canal emisor principal
         self.published_log = []
         self.alert_channel_id = None # Canal para alertas
+        self.publish_test = None    # Canal para publicaciones de testeo
         
         self.state_file = os.path.join(config.DATA_DIR, "published_state.json")
         self.config_cache_file = os.path.join(config.DATA_DIR, "config_cache.json")
@@ -54,6 +55,7 @@ class Scheduler:
                         self.admin_ids = data.get("admins", [])
                         self.target_channel_id = data.get("emisor", None)
                         self.alert_channel_id = data.get("alert", None)
+                        self.publish_test = data.get("publish_test", None)
                         log.info("🔄 Configuración cargada desde caché local.")
             except: pass
 
@@ -70,7 +72,8 @@ class Scheduler:
                     "schedule": self.schedule_map,
                     "admins": self.admin_ids,
                     "emisor": self.target_channel_id,
-                    "alert": self.alert_channel_id
+                    "alert": self.alert_channel_id,
+                    "publish_test": self.publish_test
                 }, f, indent=4)
 
     def _parse_custom_config(self, text):
@@ -79,6 +82,7 @@ class Scheduler:
         Admins = [ 123 #com, 456 ]
         Publicar = [ -100123 ]
         Aviso = [...]
+        Pub_Test = [...]
         """
         admins = []
         publicar_id = None
@@ -118,7 +122,16 @@ class Scheduler:
                     alert_id = int(item.strip())
                     break
         
-        return admins, publicar_id, alert_id
+        # 4. Publish de testeo
+        pub_test_match = re.search(r'Pub_Test\s*=\s*\[(.*?)\]', text, re.DOTALL | re.IGNORECASE)
+        if pub_test_match:
+            content = re.sub(r'#.*', '', pub_test_match.group(1))
+            for item in content.replace(',', '\n').split('\n'):
+                if item.strip().lstrip('-').isdigit():
+                    pub_test = int(item.strip())
+                    break
+
+        return admins, publicar_id, alert_id, pub_test
 
     async def load_daily_config(self):
         log.info("📥 Descargando config de Drive...")
@@ -144,24 +157,25 @@ class Scheduler:
                 self.schedule_map[parts[0].strip()] = parts[1].strip().zfill(5)
 
         # 2. Parsear Chat IDs (Admins y Emisor)
-        self.admin_ids, self.target_channel_id, self.alert_channel_id = self._parse_custom_config(raw_chat_ids)
-
-        log.info(f"✅ Config cargada: {len(self.schedule_map)} tareas | {len(self.admin_ids)} admins | Emisor: {self.target_channel_id}")
+        self.admin_ids, self.target_channel_id, self.alert_channel_id, self.publish_test = self._parse_custom_config(raw_chat_ids)
+        log.info(f"✅ Config cargada: {len(self.schedule_map)} tareas \n{len(self.admin_ids)} admins \nPublicar: {self.target_channel_id} \nAlertas: {self.alert_channel_id} \nPublicacion de Testeo: {self.publish_test}")
         self._save_state(update_config=True)
 
     async def check_and_run(self):
         now = datetime.now() - timedelta(hours=3)
         today = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
-        # 1. Auditoría Visual (Minuto 20 y 50)
-        log.info(f"⏰ Scheduler revisando tareas para {curr_time}...")
-        await telegram_service.send_message_to_me(f"⏰ Scheduler revisando tareas para {curr_time}...", destiny_chat_id=self.alert_channel_id)
+        test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=2)).strftime("%H:%M")
         
+        log.info(f"⏰ Scheduler revisando tareas. Ahora: {curr_time}... (Testing: {test_time})")
+
+        # 1. Auditoría Visual (si aplica)
         if curr_time in AUDIT_HOURS:
             # Ejecutamos en segundo plano la auditoría visual
             try:
+                smg = f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}: 🔍 Iniciando auditoría visual de carpetas...\n El bot estara ocupado aproximadamente 10 minutos"
                 log.info("🔍 Iniciando auditoría visual de carpetas...")
-                await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:🔍 Iniciando auditoría visual de carpetas...", destiny_chat_id=self.alert_channel_id)
+                await telegram_service.send_message_to_me(smg, destiny_chat_id=self.alert_channel_id)
                 
                 informes = drive_service.run_visual_audit()
                 if informes:
@@ -195,24 +209,34 @@ class Scheduler:
             await self._save_state()
           
         # 3 Chequear Horarios para publicaciones
-        for folder, time_trigger in self.schedule_map.items():
-                   
+        for folder, time_trigger in self.schedule_map.items(): 
             # Publicaciones testing 2 horas antes de la publicación real
-            # Testing (2 horas antes)
-            test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=2)).strftime("%H:%M")
-            if test_time == curr_time:
-                smg = f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ **TESTING** Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}\n"
-                smg += f"-------------------------------------------------------------------\n"
+            try:
+                if test_time == time_trigger:
+                    smg = f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ **TESTING** Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}\n"
+                    smg += f"-------------------------------------------------------------------\n"
+                    log.info(f"⏰ **TESTING** Publicando: {folder}")
+                    await telegram_service.send_message_to_me(smg, destiny_chat_id=self.alert_channel_id)
+                    from src.core.procesador import processor
+                    await processor.execute_agency_post(folder, target_chat_id=self.alert_channel_id)     
+            except Exception as e:
+                smg = f"❌ Error en **TESTING** publicando {folder}: {e}"
+                log.error(smg)
                 await telegram_service.send_message_to_me(smg, destiny_chat_id=self.alert_channel_id)
-                from src.core.procesador import processor
-                await processor.execute_agency_post(folder, target_chat_id=self.alert_channel_id)
-                pass
+                #Continua con las otras carpetas
+                continue
             
             # Publicación real
-            if time_trigger <= curr_time:
-                if folder not in self.published_log:
-                    await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
-                    await self._trigger_publication(folder)
+            try:
+                if time_trigger <= curr_time:
+                    if folder not in self.published_log:
+                        await telegram_service.send_message_to_me(f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}:⏰ Publicando carpeta programada: {folder} Para las {now.month:02d}/{now.day:02d} {time_trigger}", destiny_chat_id=self.alert_channel_id)
+                        await self._trigger_publication(folder)
+            except Exception as e:
+                log.error(f"❌ Error publicando {folder}: {e}")
+                await telegram_service.send_message_to_me(f"❌ Error publicando {folder}: {e}", destiny_chat_id=self.alert_channel_id)
+                #Continua con las otras carpetas
+                continue
 
     async def _trigger_publication(self, folder, security_check=True):
         from src.core.procesador import processor
