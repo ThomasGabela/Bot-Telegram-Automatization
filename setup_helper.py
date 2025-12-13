@@ -3,7 +3,7 @@
 
 from src.services.drive_service import drive_service
 from src.config.settings import config
-from src.utils.helpers import print_lg
+from src.utils.logger import log as print_lg
 
 
 def test_drive():

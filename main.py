@@ -7,6 +7,9 @@ if platform.system() == 'Windows':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 # -----------------------------------------------------
 
+# LIBRERÍA NUEVA
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from src.config.settings import config
 from src.services.telegram_service import telegram_service
 from src.core.chat_manager import chat_manager
@@ -14,49 +17,6 @@ from src.core.scheduler import scheduler
 from src.utils.logger import log
 from pyrogram import idle
 from datetime import datetime, timedelta
-
-
-# ✅ CORRECTO para Service Accounts
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-
-# Define tus scopes
-SCOPES = ['https://www.googleapis.com/auth/drive']
-
-# Ruta a tu archivo JSON que ya descargaste
-SERVICE_ACCOUNT_FILE = 'ruta/a/tu_json_descargado.json'
-
-def autenticar_drive():
-    creds = None
-    try:
-        # Esta es la línea mágica para cuentas de servicio
-        creds = service_account.Credentials.from_service_account_file(
-                SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-        
-        # Construir el servicio
-        service = build('drive', 'v3', credentials=creds)
-        return service
-        
-    except Exception as e:
-        print(f"Error autenticando: {e}")
-        return None
-
-async def scheduler_loop():
-    """
-    Bucle infinito que revisa el reloj cada minuto.
-    Se asegura de cargar la configuración al inicio.
-    """
-    log.info("⏰ Iniciando Scheduler... Cargando configuraciones del día.")
-    await scheduler.load_daily_config() # Carga inicial forzada
-    
-    while True:
-        try:
-            await scheduler.check_and_run()
-        except Exception as e:
-            log.error(f"❌ Error crítico en el loop del scheduler: {e}")
-        
-        # Esperamos 60 segundos exactos para revisar el siguiente minuto
-        await asyncio.sleep(60 * config.CHECK_INTERVAL)
 
 async def main():
     log.info("--- SISTEMA INICIADO (OPTIMIZADO) ---")
@@ -67,15 +27,33 @@ async def main():
     # 2. Conectar el Chat Manager (Escucha activa)
     telegram_service.add_handler(chat_manager.handle_incoming_message)
     
-    # 3. Iniciar Scheduler en paralelo
-    task_scheduler = asyncio.create_task(scheduler_loop())
+    # 3. Carga inicial de configuración (Importante hacerlo una vez al inicio)
+    log.info("📅 Cargando configuración diaria inicial...")
+    await scheduler.load_daily_config()
     
-    log.info("🤖 Bot escuchando comandos y horarios...")
+    # 4. CONFIGURAR APSCHEDULER (El reemplazo del bucle while)
+    aps_scheduler = AsyncIOScheduler()
+    intervalo_min = str(config.CHECK_INTERVAL) # Aseguramos que sea string para el cron
     
-    #4. Notificación de Inicio
+    aps_scheduler.add_job(
+        scheduler.check_and_run, 
+        trigger='cron', 
+        minute=f"*/{intervalo_min}", 
+        second='0'
+    )
+    
+    aps_scheduler.start()
+    log.info(f"⏰ Scheduler activado: Ejecutando cada {intervalo_min} minutos en punto (:00).")
+    # 5. Notificación de Inicio a Telegram
+    
     try:
         target_chat = scheduler.alert_channel_id if scheduler.alert_channel_id else "me"
-        startup_msg = f"📅{(datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')}: 🤖 **Bot Iniciado Correctamente**"
+        hora_arg = (datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')
+        startup_msg = (
+            f"🚀 **Bot Iniciado Correctamente**\n"
+            f"📅 Hora Sistema: {hora_arg}\n"
+            f"⏱️ Intervalo: Cron cada {intervalo_min} minutos\n"
+        )
         await telegram_service.send_message_to_me(startup_msg, destiny_chat_id=target_chat)
     except Exception as e:
         log.error(f"No se pudo enviar mensaje de inicio: {e}")
@@ -83,8 +61,10 @@ async def main():
     # Mantener corriendo
     await idle()
     
-    # Cierre limpio
-    task_scheduler.cancel()
+
+    # --- Cierre Limpio (Al detener el bot con Ctrl+C) ---
+    log.info("Apagando sistemas...")
+    aps_scheduler.shutdown()
     await telegram_service.stop()
 
 if __name__ == "__main__":

@@ -1,11 +1,10 @@
 import io, os.path, calendar, time
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from src.config.settings import config
 from src.utils.logger import log
 from datetime import datetime, timedelta
 from src.config.settings import config
+from utils.decorators import retry_on_network_error
 
 # ✅ CORRECTO para Service Accounts
 from google.oauth2 import service_account
@@ -48,7 +47,8 @@ class DriveService:
 
         except Exception as e:
             raise(f"Error autenticando: {e}")
-
+    
+    @retry_on_network_error()
     def find_item_id_by_name(self, parent_id, item_name, is_folder=False, exact_match=False):
         if not self.service: return None
         mime_type_clause = "and mimeType = 'application/vnd.google-apps.folder'" if is_folder else "and mimeType != 'application/vnd.google-apps.folder'"
@@ -62,14 +62,14 @@ class DriveService:
         except Exception as e:
             log.error(f"Error buscando '{item_name}': {e}")
             return None
-
+    
+    @retry_on_network_error()
     def run_visual_audit(self):
         """Revisa conteo de archivos y pinta carpetas (Semáforo)"""
         log.info("🎨 Iniciando Auditoría Visual de Drive...")
         now = datetime.now() - timedelta(hours=3)
         
         informe = ""
-        informe += f"🤖{now.strftime('%Y-%m-%d %H:%M:%S')}: 🎨 Iniciando Auditoría Visual (Single Mode)...\n"
         # 1. Obtener Agencias
         agencies = self.get_available_folders()
         root = config.DRIVE_ROOT_ID
@@ -96,7 +96,7 @@ class DriveService:
                
                 for day_folder in days_folders:
                     d_id = day_folder['id']
-                    log.info(day_folder)
+                    # log.info(day_folder)
                     current_color = self.get_folder_color_hex(d_id)
                     # --- PAUSA DE SEGURIDAD (ANTI-BAN) ---
                     # 0.2 segundos es invisible para el usuario pero vital para la API
@@ -133,9 +133,11 @@ class DriveService:
                         continue
         
         log.info("🎨 Auditoría finalizada.")
+        if informe == "": informe = f"No se han realizado cambios.\n"
         informe += f"🤖{(datetime.now() - timedelta(hours=3)).strftime('%H:%M:%S')}: 🎨 Auditoría Visual finalizada.\n"
         return informe
-
+    
+    @retry_on_network_error()
     def get_folder_color_hex(self, folder_id):
             """
             Obtiene el color hexadecimal de una carpeta. 
@@ -149,12 +151,13 @@ class DriveService:
                 ).execute()
                 
                 color = file.get('folderColorRgb')
-                log.info(f"Color detectado para carpeta {folder_id}: {color}") # Descomentar para debug
+                # log.info(f"Color detectado para carpeta {folder_id}: {color}") # Descomentar para debug
                 return color
             except Exception as e:
                 print(f"Error obteniendo color: {e}")
                 return None
-
+    
+    @retry_on_network_error()
     def count_media_files_in_folder(self, folder_id):
             """
             Cuenta cuántos archivos (que no sean carpetas) hay dentro del ID dado.
@@ -174,7 +177,8 @@ class DriveService:
             except Exception as e:
                 print(f"Error contando archivos: {e}")
                 return 0
-
+    
+    @retry_on_network_error()
     def create_folder(self, folder_name, parent_id):
         """Crea una carpeta y retorna su ID"""
         meta = {
@@ -188,7 +192,8 @@ class DriveService:
         except Exception as e:
             log.error(f"Error creando carpeta {folder_name}: {e}")
         return None
-
+    
+    @retry_on_network_error()
     def create_agency_structure(self, agency_name):
         """Crea Agencia -> Mes Actual/Siguiente -> Días (01-31)"""
         root = config.DRIVE_ROOT_ID
@@ -226,7 +231,8 @@ class DriveService:
                 if not self.find_item_id_by_name(month_id, day_str, is_folder=True, exact_match=True):
                     self.create_folder(day_str, month_id)
         return True
-
+    
+    @retry_on_network_error()
     def run_monthly_maintenance(self):
         """Mueve el mes pasado a Backlog"""
         log.info("🧹 Ejecutando mantenimiento mensual...")
@@ -284,6 +290,7 @@ class DriveService:
         informe += f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}: 🧹 Mantenimiento mensual finalizado.\n"
         return informe
     
+    @retry_on_network_error()
     def get_text_content(self, file_id):
             """Descarga texto plano o Google Docs exportado"""
             if not file_id or not self.service: return ""
@@ -321,7 +328,8 @@ class DriveService:
                 else:
                     log.error(f"Error leyendo archivo {file_id}: {e}")
                     return ""
-
+    
+    @retry_on_network_error()
     def get_project_settings(self):
         if not config.DRIVE_ROOT_ID: return None, None
         settings_id = self.find_item_id_by_name(config.DRIVE_ROOT_ID, "Settings", is_folder=True)
@@ -329,7 +337,8 @@ class DriveService:
         config_id = self.find_item_id_by_name(settings_id, config.FILE_SCHEDULE)
         emojis_id = self.find_item_id_by_name(settings_id, config.FILE_EMOJIS)
         return (self.get_text_content(config_id), self.get_text_content(emojis_id))
-
+    
+    @retry_on_network_error()
     def list_files_in_folder(self, folder_id):
         if not self.service: return []
         try:
@@ -339,7 +348,8 @@ class DriveService:
         except Exception as e:
             log.error(f"Error listando {folder_id}: {e}")
             return []
-
+    
+    @retry_on_network_error()
     def download_file(self, file_id, file_name):
         if not self.service: return None
         try:
@@ -354,7 +364,8 @@ class DriveService:
         except Exception as e:
             log.error(f"Error descargando {file_name}: {e}")
             return None
-
+    
+    @retry_on_network_error()
     def update_text_file(self, folder_name, content_string):
         """
         Guarda o actualiza el archivo 'caption' como GOOGLE DOC.
@@ -403,6 +414,7 @@ class DriveService:
             log.error(f"Error guardando Doc: {e}")
             return False, str(e)
     
+    @retry_on_network_error()
     def get_available_folders(self):
         """Devuelve una lista con los nombres de las carpetas en la raíz."""
         if not self.service or not config.DRIVE_ROOT_ID:
@@ -424,7 +436,8 @@ class DriveService:
         except Exception as e:
             log.error(f"Error listando carpetas: {e}")
             return []
-        
+    
+    @retry_on_network_error()  
     def save_to_inbox(self, content_string, identifier=0):
         """Guarda mensaje en carpeta 'Buzon' (Task 3)"""
         if not self.service: return False

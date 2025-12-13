@@ -29,8 +29,6 @@ async def main():
     if drive_service:
         results = drive_service.files().list(pageSize=10).execute()
         items = results.get('files', [])
-    with open("items.json", 'w') as f:
-        json.dump(items, f, indent=4)
     print("Conexión exitosa. Archivos encontrados:", items)
     
     print("--- INICIANDO DIAGNÓSTICO DE TELEGRAM ---")
