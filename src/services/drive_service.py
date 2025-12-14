@@ -4,7 +4,7 @@ from src.config.settings import config
 from src.utils.logger import log
 from datetime import datetime, timedelta
 from src.config.settings import config
-from utils.decorators import retry_on_network_error
+from src.utils.decorators import retry_on_network_error
 
 # ✅ CORRECTO para Service Accounts
 from google.oauth2 import service_account
