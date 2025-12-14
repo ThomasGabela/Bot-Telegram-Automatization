@@ -165,9 +165,9 @@ class Scheduler:
         now = datetime.now() - timedelta(hours=3)
         today = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
-        test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=1)).strftime("%H:%M")
+        test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=1)).strftime("%H:%M:")
         
-        log.info(f"⏰ Scheduler revisando tareas. Ahora: {curr_time}... (Testing: {test_time})")
+        log.info(f"⏰ Scheduler revisando tareas. Ahora: {now}... (Testing: {test_time})")
 
         # 1. Auditoría Visual (si aplica)
         if curr_time in AUDIT_HOURS:
