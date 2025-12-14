@@ -165,7 +165,7 @@ class Scheduler:
         now = datetime.now() - timedelta(hours=3)
         today = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
-        test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=2)).strftime("%H:%M:")
+        test_time = (datetime.strptime(curr_time, "%H:%M") + timedelta(hours=2)).strftime("%H:%M")
         
         log.info(f"⏰ Scheduler revisando tareas. Ahora: {now}... (Testing: {test_time})")
 
