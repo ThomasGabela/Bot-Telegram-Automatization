@@ -206,7 +206,7 @@ class Scheduler:
                     await telegram_service.send_message_to_me(f"❌ Error en Mantenimiento Mensual: {e}", destiny_chat_id=self.alert_channel_id)
                 # -----------------------------
             
-            await self._save_state()
+            self._save_state()
           
         # 3 Chequear Horarios para publicaciones
         for folder, time_trigger in self.schedule_map.items(): 
