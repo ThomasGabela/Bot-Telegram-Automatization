@@ -169,23 +169,23 @@ class Scheduler:
         
         log.info(f"⏰ Scheduler revisando tareas. Ahora: {now}... (Testing: {test_time})")
 
-        # 1. Auditoría Visual (si aplica)
-        if curr_time in AUDIT_HOURS:
-            # Ejecutamos en segundo plano la auditoría visual
-            try:
-                smg = f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}: 🔍 Iniciando auditoría visual de carpetas...\n El bot estara ocupado aproximadamente 10 minutos"
-                log.info("🔍 Iniciando auditoría visual de carpetas...")
-                await telegram_service.send_message_to_me(smg, destiny_chat_id=self.alert_channel_id)
+    # 1. Auditoría Visual (si aplica)
+        # if curr_time in AUDIT_HOURS:
+        #     # Ejecutamos en segundo plano la auditoría visual
+        #     try:
+        #         smg = f"🤖 {now.strftime('%Y-%m-%d %H:%M:%S')}: 🔍 Iniciando auditoría visual de carpetas...\n El bot estara ocupado aproximadamente 10 minutos"
+        #         log.info("🔍 Iniciando auditoría visual de carpetas...")
+        #         await telegram_service.send_message_to_me(smg, destiny_chat_id=self.alert_channel_id)
                 
-                informes = drive_service.run_visual_audit()
-                if informes:
-                    # Enviar reporte solo si hubo cambios/errores relevantes (opcional: o siempre)
-                    # Cortar mensaje si es muy largo para Telegram (max 4096)
-                    if len(informes) > 4000: informes = informes[:4000] + "..."
-                    await telegram_service.send_message_to_me(f"✅ Auditoría visual completada. Informes generados:\n{informes}", destiny_chat_id=self.alert_channel_id)
-            except Exception as e:
-                log.error(f"Error auditoría visual: {e}")
-                await telegram_service.send_message_to_me(f"❌ Error en auditoría visual: {e}", destiny_chat_id=self.alert_channel_id)
+        #         informes = drive_service.run_visual_audit()
+        #         if informes:
+        #             # Enviar reporte solo si hubo cambios/errores relevantes (opcional: o siempre)
+        #             # Cortar mensaje si es muy largo para Telegram (max 4096)
+        #             if len(informes) > 4000: informes = informes[:4000] + "..."
+        #             await telegram_service.send_message_to_me(f"✅ Auditoría visual completada. Informes generados:\n{informes}", destiny_chat_id=self.alert_channel_id)
+        #     except Exception as e:
+        #         log.error(f"Error auditoría visual: {e}")
+        #         await telegram_service.send_message_to_me(f"❌ Error en auditoría visual: {e}", destiny_chat_id=self.alert_channel_id)
         
         # 2. Reinicio diario de publish_log
         if self.current_date != today:

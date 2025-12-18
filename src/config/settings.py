@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
-    MULTIMEDIA_COUNT = 6  # Cantidad de archivos multimedia a enviar por mensaje
+    MULTIMEDIA_COUNT = 5  # Cantidad de archivos multimedia a enviar por mensaje
     # Telegram
     API_ID = os.getenv("TELEGRAM_API_ID")
     API_HASH = os.getenv("TELEGRAM_API_HASH")
